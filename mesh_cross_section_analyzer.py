@@ -740,8 +740,6 @@ class MeshCrossSectionAnalyzer:
             ((self.mesh.glass_outer_radius + self.mesh.cement_outer_radius) * 0.5, 'Cement'),
             ((self.mesh.cement_outer_radius + self.mesh.ceramic_outer_radius) * 0.5, 'Ceramic'),
             ((self.mesh.ceramic_outer_radius + self.mesh.reflective_outer_radius) * 0.5, 'Reflective Al'),
-            ((self.mesh.cylindrical_outer_radius + self.mesh.air_gap_outer) * 0.5, 'Air Gap'),
-            ((self.mesh.air_gap_outer + self.mesh.aluminum_box_outer) * 0.5, 'Al Box')
         ]
         
         for radius, label in layers:

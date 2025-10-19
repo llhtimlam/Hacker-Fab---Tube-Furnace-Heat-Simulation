@@ -30,8 +30,9 @@ class TubeFurnaceMesh:
         print("Creating correct tube furnace mesh from scratch")
         self.r_nodes = None
         self.z_nodes = None
+        self.starting_index = int(config.RADIAL_NODES_SAMPLE)
 
-        # Physical boundaries (from config)
+        # Physical boundaries dimensions (from config)
         self.sample_radius = config.GLASS_TUBE_INNER_RADIUS
         self.glass_outer_radius = config.GLASS_TUBE_OUTER_RADIUS
         self.kanthal_outer_radius = config.HEATING_COIL_RADIUS
@@ -41,30 +42,38 @@ class TubeFurnaceMesh:
 
         self.kanthal_axial_start = config.HEATING_COIL_START
         self.kanthal_axial_end = config.HEATING_COIL_END
-        
-        self.sample_glass_interface = None
-        self.glass_kanthal_cement_interface = None
-        self.kanthal_cement_interface = None
-        self.cement_ceramic_interface = None
-        self.ceramic_reflective_interface = None
-        self.reflective_outer_interface = None
+        self.ztotal_length = config.FURNACE_LENGTH
+        # Radial boundary interfaces
+        # Need - 1 per progression, config node is faces to faces where it is overlapped
+        self.sample_glass_interface = self.starting_index
+        self.glass_kanthal_cement_interface = self.sample_glass_interface + int(config.RADIAL_NODES_GLASS) - 1
+        self.kanthal_cement_interface = self.glass_kanthal_cement_interface + int(config.RADIAL_NODES_KANTHAL) - 1
+        self.cement_ceramic_interface = self.kanthal_cement_interface + int(config.RADIAL_NODES_CEMENT) - 1
+        self.ceramic_reflective_interface = self.cement_ceramic_interface + int(config.RADIAL_NODES_CERAMIC) - 1
+        self.reflective_outer_interface = self.ceramic_reflective_interface + int(config.RADIAL_NODES_REFLECTIVE) - 1
+        # Axial boundary interfaces
+        self.cold_heat_interface_front = int(config.AXIAL_NODES_BEFORE) - 1
+        self.cold_heat_interface_back = self.cold_heat_interface_front + int(config.AXIAL_NODES_HEATING) # Heating node Overwrite overlap
 
-        self.cold_heat_interface_front = None
-        self.cold_heat_interface_back = None
+        self.kanthal_r_position_start = self.glass_outer_radius
+        self.kanthal_r_position_end = self.kanthal_outer_radius
+        self.kanthal_z_position_start = self.kanthal_axial_start
+        self.kanthal_z_position_end = self.kanthal_axial_end
 
-        self.kanthal_r_position_start = None
-        self.kanthal_r_position_end = None
-        self.kanthal_z_position_start = None
-        self.kanthal_z_position_end = None
+        self.inner_glass_tube_area = 2 * np.pi * self.sample_radius * self.ztotal_length
+        self.outer_reflective_area = 2 * np.pi * self.reflective_outer_radius * self.ztotal_length 
+        self.inner_cubic_shortest_distance = self.reflective_outer_radius + config.AIR_GAP_THICKNESS
+        self.outer_cubic_shortest_distance = self.inner_cubic_shortest_distance + config.ENCLOSURE_WALL_THICKNESS
+        self.cubic_inner_surface = 2 * self.inner_cubic_shortest_distance * self.ztotal_length * 4 # Assume it is sliced from actual 3D
+        self.cubic_outer_surface = 2 * self.outer_cubic_shortest_distance * self.ztotal_length * 4 # Assume it is sliced from actual 3D
+        
+        # Volumes for energy calculations
+        self.cylindrical_volume_include_sample = np.pi * (self.reflective_outer_radius ** 2) * self.ztotal_length
+        self.sample_air_space_volume = np.pi * (self.sample_radius ** 2) * self.ztotal_length
+        self.cylindrical_region_volume = self.cylindrical_volume_include_sample - self.sample_air_space_volume
+        self.cubic_air_gap_volume = (2 *self.inner_cubic_shortest_distance) ** 2 * self.ztotal_length - self.cylindrical_volume_include_sample
+        self.cubic_aluminium_casing_volume = (2 *self.outer_cubic_shortest_distance) ** 2 * self.ztotal_length - self.cylindrical_volume_include_sample - self.cubic_air_gap_volume
 
-        self.inner_glass_tube_area = None
-        self.cubic_inner_surface = None
-        self.cubic_outer_surface = None
-        
-        # Cubic Volumes for energy calculations
-        self.cubic_air_gap_volume = None
-        self.cubic_aluminium_casing_volume = None
-        
         # Cylindrical region boundary: outer surface of reflective aluminum foil
         self.cylindrical_outer_radius = self.reflective_outer_radius
         self.cylindrical_length = config.FURNACE_LENGTH  # 12 inches total length
@@ -108,23 +117,27 @@ class TubeFurnaceMesh:
         r_node = []
         
         # Layer 1: Sample region (0 to sample_radius)
-        #r_sample = np.linspace(0, self.sample_radius, config.RADIAL_NODES_SAMPLE, endpoint=True)
-        #r_nodes.extend(r_sample)  # Placeholder at center point of sample region  (single node)
+        if config.RADIAL_NODES_SAMPLE < 2:
+            r_sample = np.linspace(0, self.sample_radius, config.RADIAL_NODES_SAMPLE, endpoint=True)[:] #r_sample = [0]
+            r_node.extend(r_sample)  # Placeholder at center point of sample region  (single node)
+        else:
+            r_sample = np.linspace(0, self.sample_radius, config.RADIAL_NODES_SAMPLE, endpoint=True)[:-1]
+            r_node.extend(r_sample)
 
         # Layer 2: Glass tube (sample_radius to glass_outer_radius)  
-        r_glass = np.linspace(self.sample_radius, self.glass_outer_radius, config.RADIAL_NODES_GLASS, endpoint=True)[1:]
+        r_glass = np.linspace(self.sample_radius, self.glass_outer_radius, config.RADIAL_NODES_GLASS, endpoint=True)[:-1]
         r_node.extend(r_glass) # Exclude overlap with next layer
         
         # Layer 2: Furnace cement AND Kanthal heating element (glass_outer to kanthal_outer)
-        r_kanthal_cement = np.linspace(self.glass_outer_radius, self.kanthal_outer_radius, config.RADIAL_NODES_KANTHAL, endpoint=True)[1:]
+        r_kanthal_cement = np.linspace(self.glass_outer_radius, self.kanthal_outer_radius, config.RADIAL_NODES_KANTHAL, endpoint=True)
         r_node.extend(r_kanthal_cement) # Required at least 2 point to find center
 
         # Layer 3: Furnace cement (glass_outer to cement_outer)
-        r_cement = np.linspace(self.kanthal_outer_radius, self.cement_outer_radius, config.RADIAL_NODES_CEMENT, endpoint=True)[1:]
+        r_cement = np.linspace(self.kanthal_outer_radius, self.cement_outer_radius, config.RADIAL_NODES_CEMENT, endpoint=True)[1:-1]
         r_node.extend(r_cement) # Exclude overlap with next and previous layer
         
         # Layer 4: Ceramic wool (cement_outer to ceramic_outer)
-        r_ceramic = np.linspace(self.cement_outer_radius, self.ceramic_outer_radius, config.RADIAL_NODES_CERAMIC, endpoint=True)[1:]
+        r_ceramic = np.linspace(self.cement_outer_radius, self.ceramic_outer_radius, config.RADIAL_NODES_CERAMIC, endpoint=True)[:-1]
         r_node.extend(r_ceramic) # Exclude overlap with next layer
         
         # Layer 5: Reflective aluminium (ceramic_outer to reflective_outer)
@@ -158,43 +171,12 @@ class TubeFurnaceMesh:
         # Create cylindrical meshgrid
         #self.sample_glass_interface = np.searchsorted(self.r_nodes, self.sample_radius)
         # Convert to faces and centers for solver.py for Finite Volume Method (FVM) Lumped-Element Model Hybrid Heat Simulation System
-        self.r_faces = self.r_nodes # Trimmed Sample Air Space Region for Cylindrical Continuous Conduction Region for FVM
+        self.r_faces = self.r_nodes[self.starting_index:] # Trimmed Sample Air Space Region for Cylindrical Continuous Conduction Region for FVM
         self.z_faces = self.z_nodes
         # Cell centers are the average of adjacent faces
         self.r_centers = (self.r_faces[:-1] + self.r_faces[1:]) / 2.0
         self.z_centers = (self.z_faces[1:] + self.z_faces[:-1]) / 2.0
 
-        # Radial interface indices
-        self.glass_kanthal_cement_interface = np.searchsorted(self.r_faces, self.glass_outer_radius)
-        self.kanthal_cement_interface = np.searchsorted(self.r_faces, self.kanthal_outer_radius)
-        self.cement_ceramic_interface = np.searchsorted(self.r_faces, self.cement_outer_radius)
-        self.ceramic_reflective_interface = np.searchsorted(self.r_faces, self.ceramic_outer_radius)
-        self.reflective_outer_interface = np.searchsorted(self.r_faces, self.reflective_outer_radius)  # Last valid index
-
-        # Axial interface indices
-        self.cold_heat_interface_front = np.searchsorted(self.z_faces, config.HEATING_COIL_START)
-        self.cold_heat_interface_back = np.searchsorted(self.z_faces, config.HEATING_COIL_END)
-
-        # Kanthal coil position based on coordinates, not node counts
-        self.kanthal_r_position_start = np.searchsorted(self.r_faces, self.glass_outer_radius)
-        self.kanthal_r_position_end = np.searchsorted(self.r_faces, self.kanthal_outer_radius)
-        self.kanthal_z_position_start = np.searchsorted(self.z_faces, config.HEATING_COIL_START)
-        self.kanthal_z_position_end = np.searchsorted(self.z_faces, config.HEATING_COIL_END)
-
-        # Cylindrical surface boundaries
-        self.inner_glass_tube_area = 2 * np.pi * self.sample_radius * config.FURNACE_LENGTH
-
-        # Cylindrical Volumes for energy calculations
-        self.sample_air_space_volume = np.pi * self.sample_radius**2 *  self.cylindrical_length
-
-        # Cubic surface boundaries
-        self.cubic_inner_surface = 4 * self.cubic_inner_dimension ** 2 * self.cylindrical_length
-        self.cubic_outer_surface = 4 * self.cubic_outer_dimension ** 2 * self.cylindrical_length
-        
-        # Cubic Volumes for energy calculations
-        self.cubic_air_gap_volume = (self.cubic_inner_dimension**2 * self.cylindrical_length) - (np.pi * (self.cylindrical_outer_radius**2) * self.cylindrical_length) # Assume 2D cylindrical system
-        self.cubic_aluminium_casing_volume = (self.cubic_outer_dimension**2 - self.cubic_inner_dimension**2) * self.cylindrical_length
-        
         # Axial discretization for 12-inch total length with proper cold/heating zones
         cold_zone_length_inches = (config.FURNACE_LENGTH - config.HEATING_COIL_LENGTH) / 2 / 0.0254  # Convert to inches
         heating_zone_length_inches = config.HEATING_COIL_LENGTH / 0.0254
@@ -272,7 +254,7 @@ class TubeFurnaceMesh:
         print("="*60)
         
         print("\nCYLINDRICAL REGION (inner components):")
-        print(f"  Physical layers: Sample -> Glass -> Cement -> Ceramic -> Reflective Al")
+        print(f"  Physical layers: Sample -> Glass -> (Kanthal)Cement -> Ceramic -> Reflective Al")
         print(f"  Radial nodes: {len(self.r_nodes)}")
         print(f"  Axial nodes: {len(self.z_nodes)}")  
         print(f"  Total cylindrical nodes: {len(self.r_nodes) * len(self.z_nodes):,}")

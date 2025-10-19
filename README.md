@@ -1,21 +1,81 @@
-# Tube Furnace Heat Simulation
+# Tube Furnace Heat Simulation(WIP)
 
-A comprehensive 3D finite element heat transfer simulation for tube furnace design with high-resolution physics modeling and temperature-dependent material properties.
+Currently Working File:
+config.py
+material.py
+mesh.py
+requirements.txt
+solver.py (graphic function is not fully implemented)
 
-## 🔥 **7-Layer Tube Furnace System Design**
+# Pseudo-3D/2D Cylindrical Finite Volume Method (FVM) – Lumped Element Model Hybrid Heat Simulater
 
-This simulation models a **7-layer concentric tube furnace system** with precise heat transfer physics:
+A customized heat simulation model developed for small-scale tube furnaces, where traditional commercial thermal analysis tools are inadequate due to severe time step constraints imposed by the Courant–Friedrichs–Lewy (CFL) condition.
+
+This hybrid model combines a pseudo-3D/2D cylindrical Finite Volume Method (FVM) with a Lumped Element approach, optimizing both computational efficiency and physical accuracy.
+
+# Key Features
+
+# Comprehensive Heat Transfer Modeling
+
+- Models conduction, convection, and radiation heat transfer mechanisms.
+
+Supports various boundary conditions:
+
+- Dirichlet (Fixed Temperature)
+- Neumann (Fixed Heat Flux)
+- Robin (Convective/Radiative Heat Transfer)
+
+- Surface emissivity, convective coefficients, and ambient conditions are fully configurable.
+
+# Hybrid Numerical Modeling
+
+- Spatially resolved finite volume discretization in cylindrical and annular domains.
+
+- Integrated with lumped-element thermal modeling for components where full spatial resolution is unnecessary.
+
+- Supports axisymmetric configurations with scalable radial and axial resolution.
+
+# CFL Condition Bypass
+
+- Explicit handling of time step constraints to avoid CFL limitations.
+
+- Allows relatively large, and practical time steps while maintaining numerical stability.
+
+- Adjustable mesh density for tailored spatial resolution and computational cost.
+
+# Flexible Geometry Configuration
+
+- Supports solid and multi-layered hollow cylindrical geometries.
+
+- Fully customizable dimensions, mesh granularity, and layer configurations.
+
+- Material properties can be defined as constants or functions of temperature (with interpolation support).
+
+- Configurable internal heat generation for simulating resistive heating, chemical reactions, or other volumetric sources.
+
+# Target Applications
+
+- Simulation of thermal profiles in custom or small-scale tube furnaces.
+
+- Prototyping and virtual testing of heating profiles in laboratory-scale reactors.
+
+- Modeling of thermal response in high-temperature material processing environments.
+
+## Current System: **Pseudo-3D/2D Cylindrical 5-Layer Tube Furnace System Design**
+
+This simulation models a **5-layer concentric tube furnace system** with precise heat transfer physics:
 
 ### **Layer Structure (from center outward):**
 
 ```
-Layer 1: AIR (Sample Space)          │ r = 0 → 11.43mm
-Layer 2: BOROSILICATE GLASS          │ r = 11.43mm → 12.7mm
-Layer 3: IMPERIAL CEMENT             │ r = 12.7mm → 15.2mm  
-Layer 4: KANTHAL COIL (embedded)     │ r = ~14mm (heating zone)
-Layer 5: LYRUFEXON CERAMIC FIBER     │ r = 15.2mm → 117.5mm
-Layer 6: REFLECTIVE ALUMINUM CASING  │ r = 117.5mm → 118.5mm
-Layer 7: AIR GAP + ALUMINUM 5052     │ r = 118.5mm → 151.5mm
+Layer 1: AIR (Sample Space)          │ r = 0 → mm
+Layer 2: QUARTZ GLASS                │ r = mm → mm
+Layer 3: ANTHAL COIL (embedded)      │ r = mm → mm  (heating zone)
+Layer 4: IMPERIAL CEMENT             │ r = mm → mm
+Layer 5: LYRUFEXON CERAMIC FIBER     │ r = mm → mm
+Layer 6: REFLECTIVE ALUMINUM CASING  │ r = mm → mm
+Layer 7: SEALED AIR GAP              │ r = mm → mm
+Layer 7: ALUMINUM 5052               │ r = mm → mm
 ```
 
 ### **Heat Transfer Flow Analysis:**
@@ -23,8 +83,8 @@ Layer 7: AIR GAP + ALUMINUM 5052     │ r = 118.5mm → 151.5mm
 #### **1. Heat Generation (Layer 4 - Kanthal Coil):**
 - **Power Input**: 480W electrical power
 - **Heating Zone**: Z = 25.4mm to 279.4mm (254mm span)
-- **Distribution**: 39 physical turns → 41 computational positions (continuous coverage)
-- **Temperature**: Coil reaches ~800-1000°C during operation
+- **Distribution**: 39 physical turns → 39 computational positions (continuous coverage)
+- **Temperature**: 
 - **Heat Mechanism**: Joule heating (I²R losses) converted to thermal energy
 
 #### **2. Heat Conduction Path:**
@@ -83,11 +143,17 @@ Cold Zone (Z=0-25mm) ← Heat Conduction → Heating Zone (Z=25-279mm) ← Heat 
 #### **Inner Boundary (r=0, centerline):**
 ```
 ∂T/∂r = 0  (symmetry condition)
+-k(∂T/∂r) = h_conv(T_glass - T_sample)
+Convection to Inner Glass Tube Space
 ```
-
+#### **Intermediate Boundary (Reflective surface):**
+```
+-k(∂T/∂r) = h_conv(T_surface - T_unknown) + ε·σ(T_surface⁴ - T_unknown⁴)
+Combined convection + radiation across layer (T unknown°C)
+```
 #### **Outer Boundary (enclosure surface):**
 ```
--k(∂T/∂r) = h_conv(T_surface - T_ambient) + ε·σ(T_surface⁴ - T_ambient⁴)
+-k(∂T/∂r) = h_conv(T_unknown - T_ambient) + ε·σ(T_unknown⁴ - T_ambient⁴)
 Combined convection + radiation to ambient (25°C)
 ```
 
@@ -98,42 +164,45 @@ Z=0 and Z=304.8mm: Combined convection + radiation to ambient
 
 #### **Heating Zone (Coil positions):**
 ```
-Q_coil = 480W distributed over 41 positions
+Q_coil = 480W distributed over 39 positions
 Power density varies with coil turn spacing
 ```
 
 ### **Key Assumptions:**
 
-1. **Steady-state operation**: After 6-hour simulation duration
-2. **Axisymmetric geometry**: Cylindrical coordinates (r,z)
-3. **Perfect contact**: No thermal contact resistance between layers
-4. **Uniform coil heating**: Even power distribution along coil length
-5. **Natural convection**: No forced air circulation
-6. **Ambient conditions**: 25°C, atmospheric pressure
-7. **Material homogeneity**: Uniform properties within each layer
-8. **No chemical reactions**: Pure heat transfer (no combustion/decomposition)
+# Quasi-Steady-State Radiation
+Radiation heat transfer is modeled using a quasi-steady-state grey body approximation, surface emissivity remains constant and radiation exchange reaches steady conditions within each time step.
+Treating radiation only in one direction.
+No absorption and transmitance across layer.
+
+# Perfect Thermal Contact
+No thermal contact resistance is considered between adjacent material layers, interfaces are assumed to be in perfect thermal contact, allowing uninterrupted heat conduction with consistent thermal properties.
+
+# Uniform Coil Heating
+Resistive heating elements (e.g., heating coils) are assumed to have uniform power distribution along their length, resulting in consistent volumetric heat generation within the heating zone.
+
+# Natural Convection Only
+Heat transfer to the environment via convection is assumed to occur under natural convection conditions; no forced airflow or external cooling is applied. No fluid mechanic is considered.
+
+# Material Homogeneity Within Layers
+Each material layer is assumed to be homogeneous, with isotropic thermal properties. Spatial variation within a single layer is not considered.
+
+# No Chemical or Phase Reactions
+The model simulates pure heat transfer processes. Effects from chemical reactions (e.g., combustion, oxidation, decomposition) or phase changes (e.g., melting, evaporation) are excluded.
+
+# Adiabatic Axial Boundary (z-axis)
+The furnace is modeled as a segment of an infinitely long cylinder by applying adiabatic boundary conditions at the ends along the z-axis. This setting trace heat propagation in the cold zone and simplifies the domain by neglecting end effects and axial heat loss.
 
 ---
 
-## 🛠️ **Installation & Setup**
+##  **Installation & Setup**
 
-### **🚀 One-Click Complete Setup (Recommended)**
-```powershell
-# Double-click to run, or from command line:
-COMPLETE_SETUP.bat
-```
-**This handles everything automatically:**
-- ✅ Creates virtual environment (.venv)
-- ✅ Installs all dependencies from requirements.txt
-- ✅ Verifies installation
-- ✅ Provides interactive menu to run simulations
-
-### **📦 Manual Setup (Advanced Users)**
+### ** Manual Setup**
 
 #### **Step 1: Clone Repository**
 ```powershell
-git clone https://github.com/llhtimlam/Tube-Furnace-Heat-Simulation.git
-cd "Tube-Furnace-Heat-Simulation"
+git clone https://github.com/llhtimlam/Hacker-Fab---Tube-Furnace-Heat-Simulationn.git
+cd "Hacker Fab - Tube Furnace Heat Simulation"
 ```
 
 #### **Step 2: Environment & Dependencies**
@@ -148,6 +217,8 @@ pip install -r requirements.txt
 # Verify installation
 python -c "import numpy, scipy, matplotlib, plotly, h5py; print('✅ All packages ready')"
 ```
+#### **Step 3: Run Simulation**
+*Type py solver.py in Terminal**
 
 **Package Versions (Conflict-Free):**
 ```
@@ -160,26 +231,11 @@ pandas>=1.3.0,<3.0.0
 plotly>=5.0.0
 ```
 
-#### **Step 3: Run Interactive Simulation**
-```powershell
-# Run the interactive simulation tool
-python visualization.py
-
-# Follow the menu prompts:
-# 1. Setup Mode - Quick preview (~30 seconds)
-# 2. Simulation Mode - Full analysis (~5-15 minutes)
-# 3. Exit
-```
-
----
-
-## 📁 **Clean Project Structure**
-
-### **🎯 Essential Files (Everything You Need):**
+### ** Essential Files (Everything You Need):**
 
 ```
 Tube Furnace Heat Simulation/
-├── 🔥 visualization.py            # MAIN FILE - Complete simulation suite
+├── 
 ├── ⚙️ config.py                   # System configuration parameters
 ├── 🧱 materials.py                # 7-layer material properties database
 ├── 🕸️ mesh.py                     # High-resolution mesh generation
@@ -189,43 +245,9 @@ Tube Furnace Heat Simulation/
 ├── 📖 README.md                   # This documentation
 ├── 📁 .venv/                      # Python virtual environment
 ├── 📁 high_resolution_backup/     # Development backup
-├── 📁 legacy_backup/              # Legacy version backup
-└── 📁 legacy_main_backup_*/       # Previous main backup
 ```
 
-### **🔥 Main File: `visualization.py`**
-**Interactive Simulation Tool with Two Modes:**
-
-#### **🔧 SETUP MODE (Quick Preview - ~30 seconds):**
-- ✅ System layout visualization
-- ✅ 7-layer material structure diagram
-- ✅ Estimated steady-state temperatures
-- ✅ Time-to-steady-state estimates
-- ✅ Configuration summary
-- ✅ Quick HTML report with layout preview
-- ⚡ **Fast execution** - no heavy calculations
-
-#### **🚀 SIMULATION MODE (Complete Analysis - 5-15 minutes):**
-- ✅ Complete heat transfer physics simulation
-- ✅ High-resolution mesh generation (67×70 = 4,690 nodes) 
-- ✅ All visualization formats: **Matplotlib, HTML, Plotly**
-- ✅ Cross-section and longitudinal analysis
-- ✅ Interactive 3D temperature fields
-- ✅ Material layer visualization
-- ✅ Heat flux analysis with vectors
-- ✅ Mesh profile and quality assessment
-- ✅ Real-time temperature evolution
-- ✅ Comprehensive HTML report generation
-- ✅ Auto-opens results in browser
-
-#### **📋 Interactive Menu System:**
-```
-1. 🔧 SETUP MODE - Quick Layout & Temperature Preview
-2. 🚀 SIMULATION MODE - Complete Physics Analysis  
-3. ❌ EXIT
-```
-
-### **📦 Optimized Dependencies (`requirements.txt`)**
+### ** Optimized Dependencies (`requirements.txt`)**
 **Conflict-free package versions:**
 ```
 numpy>=1.21.0      # Core numerical computing
@@ -245,129 +267,33 @@ plotly>=5.0.0      # Interactive visualizations
 
 ---
 
-## ⚙️ **Configuration Guide**
+##  **Configuration Guide**
 
 ### **Modifying System Parameters:**
 
-Edit `config.py` to customize the simulation:
-
-```python
-# Heating System
-HEATING_COIL_POWER = 480.0      # Watts - increase for higher temperatures
-HEATING_COIL_TURNS = 39         # Physical coil turns
-HEATING_COIL_LENGTH = 0.254     # 10 inches heating zone
-
-# Geometry
-FURNACE_LENGTH = 0.3048         # 12 inches total length
-GLASS_TUBE_OUTER_DIAMETER = 0.0254  # 1 inch OD
-INSULATION_OUTER_RADIUS = 0.1175    # Insulation thickness
-
-# Simulation Parameters  
-SIMULATION_DURATION = 6.0 * 3600    # 6 hours simulation time
-TIME_STEP_SECONDS = 1.0             # Time step for stability
-```
+Edit `config.py` to customize the simulation setup:
 
 ### **Material Properties:**
 
-All materials in `materials.py` have temperature-dependent properties:
+Edit `materials.py` for editing material properties
+
+All materials in `materials.py` must have temperature-dependent properties:
 - Thermal conductivity k(T)
 - Specific heat cp(T) 
 - Density ρ(T)
 
-To modify a material, edit the temperature ranges and property arrays in the `_initialize_materials()` method.
+Support interpolation with cubic interpolating that can be customized
 
----
+### **Mesh Geometry:**
 
-## 📊 **Simulation Output**
+Edit `mesh.py` for editing mesh spatial geometry
 
-### **🎯 Main Output: Interactive HTML Report**
+##  **Simulation Output**
 
-Running `visualization.py` generates:
+### ** Main Output: h5.file and np.plot diagram**
 
-**📁 `simulation_results/`**
-```
-├── simulation_report.html           # 🌐 Main interactive report (auto-opens)
-├── visualizations/
-│   ├── cross_section_analysis.png   # 2D temperature contours  
-│   ├── longitudinal_analysis.png    # Axial temperature profiles
-│   ├── temperature_profiles.png     # Material layer temperatures
-│   ├── material_layers.png          # 7-layer structure visualization
-│   ├── heat_flux_analysis.png       # Heat flow vectors and magnitude
-│   ├── mesh_profile.png             # Computational mesh quality
-│   ├── interactive_3d_temperature.html      # 3D temperature field
-│   ├── interactive_cross_section.html       # Interactive 2D plots
-│   └── interactive_dashboard.html           # Complete dashboard
-└── data/
-    ├── temperature_field.npy        # Raw temperature data
-    ├── simulation_results.json      # Key metrics and parameters
-    ├── mesh_r.npy, mesh_z.npy      # Mesh coordinates
-    └── time_evolution data...       # Time history (if enabled)
-```
-
-### **🔥 Key Results (Typical):**
-
-#### **Temperature Performance:**
-```
-✅ Max Temperature: ~190°C (heating zone center)
-✅ Sample Temperature: 170-190°C (uniform heating)  
-✅ Cold Zone Temperature: 35-60°C (proper heat conduction)
-✅ Enclosure Surface: <45°C (safe operation)
-✅ No Cold Gaps: Continuous 41-position heating
-```
-
-#### **Heat Transfer Efficiency:**
-```
-📊 Energy Distribution:
-   - Useful heating (sample): ~75-80%
-   - Conduction losses: ~15-20%  
-   - Radiation losses: ~3-5%
-   - Convection losses: ~2-3%
-
-🛡️ Insulation Performance:
-   - Ceramic fiber: 95%+ heat retention
-   - Reflective barrier: 95% radiation reflection
-   - Air gap: Effective thermal isolation
-```
-
-### **📈 Visualization Features:**
-
-- **Cross-section plots**: Temperature contours with material boundaries
-- **Longitudinal analysis**: Heat distribution along tube length  
-- **3D interactive**: Rotatable temperature field visualization
-- **Heat flux vectors**: Direction and magnitude of heat flow
-- **Material performance**: Temperature in each of 7 layers
-- **Mesh quality**: Computational grid structure and resolution
-- **Time evolution**: Temperature development over simulation time
-
----
-
-## 🎯 **Mode Selection Guide**
-
-### **When to Use Setup Mode:**
-- ✅ First-time users exploring the system
-- ✅ Quick layout verification before full simulation
-- ✅ Checking if configuration parameters make sense
-- ✅ Getting rough temperature estimates
-- ✅ Understanding the 7-layer structure
-- ✅ Fast turnaround needed (<1 minute)
-
-### **When to Use Simulation Mode:**
-- ✅ Accurate temperature predictions needed
-- ✅ Detailed heat flux analysis required
-- ✅ Complete physics validation
-- ✅ Publication-quality results
-- ✅ Time for full calculation available (5-15 minutes)
-- ✅ Interactive 3D visualizations desired
-
-### **Typical Workflow:**
-1. **Start with Setup Mode** - Get familiar with the system
-2. **Adjust parameters** in `config.py` if needed
-3. **Run Simulation Mode** - Get accurate results
-4. **Analyze outputs** in the generated HTML reports
-
----
+Run `solver.py` 
 
 **Last Updated**: October 2025  
-**Project Status**: ✅ **Cleaned & Optimized** - Single-file solution ready  
-**Dependencies**: ✅ **Conflict-Free** - Tested package versions  
-**Installation**: ✅ **One-Click** - COMPLETE_SETUP.bat handles everything
+**Project Status**:  **WIP**
+**Dependencies**:  **Conflict-Free** - Tested package versions

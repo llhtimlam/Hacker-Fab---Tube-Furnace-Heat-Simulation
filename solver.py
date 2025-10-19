@@ -15,6 +15,7 @@ from functools import cached_property
 import config
 from materials import TubeFurnaceMaterials
 from mesh import TubeFurnaceMesh
+import pandas as pd
 
 class TubeFurnaceHeatSolver:
     """Advanced heat transfer solver with high spatial and temporal resolution"""
@@ -46,11 +47,11 @@ class TubeFurnaceHeatSolver:
         self.dr_grid = np.tile(np.diff(self.dr_centers), (self.num_z, 1)).T # 2D r*z  o
         self.dz_grid = np.tile(np.diff(self.dz_centers), (self.num_r, 1)) # 2D r*z  o
         # Negatively-biased face, Both faces got trimmed by 1, right centered got trimmed but left remained # |(0) o(0) |(1) and # |(n-1) o(n-1) |(n) o(n) extra
-        self.dr1_grid = np.tile(np.diff(self.r_faces[1:-1] - self.r_centers[:-1], prepend=self.r_centers[0]), (self.num_z, 1)).T # 2D r-1*z <
-        self.dr2_grid = np.tile(np.diff(self.r_centers[:-1] - self.r_faces[1:-1], append=self.r_faces[-1]), (self.num_z, 1)).T # 2D r-1*z >
-        self.dz1_grid = np.tile(np.diff(self.z_faces[1:-1] - self.z_centers[:-1], prepend=self.z_centers[0]), (self.num_r, 1)) # 2D r*z-1 <
-        self.dz2_grid = np.tile(np.diff(self.z_centers[:-1] - self.z_faces[1:-1], append=self.z_faces[-1]), (self.num_r, 1)) # 2D r*z-1 >
-        
+        self.dr1_grid = np.tile(self.r_faces[1:-1] - self.r_centers[:-1], (self.num_z, 1)).T # 2D r-1*z <
+        self.dr2_grid = np.tile(self.r_centers[1:] - self.r_faces[1:-1], (self.num_z, 1)).T # 2D r-1*z >
+        self.dz1_grid = np.tile(self.z_faces[1:-1] - self.z_centers[:-1], (self.num_r, 1)) # 2D r*z-1 <
+        self.dz2_grid = np.tile(self.z_centers[1:] - self.z_faces[1:-1], (self.num_r, 1)) # 2D r*z-1 >
+
         # Precompute face areas and volumes
         self.volume, self.area_inner_face, self.area_outer_face, self.axial_face_area = self.precompute_face_volumes()
         self.cubic_outer_surface = self.mesh.cubic_outer_surface
@@ -97,13 +98,13 @@ class TubeFurnaceHeatSolver:
         
     def initialize_simulation(self):
         """Initialize mesh, materials, and temperature field"""
-        print("Initializing high-resolution simulation...")
+        #print("Initializing high-resolution simulation...")
         # Generate mesh system
 
         self.mesh.generate_complete_mesh()
         self.material_map_cylindrical_centered = self.mesh.material_map_cylindrical_centered
         # Initialize temperature fields for Cylindrical region
-        self.T = np.full((len(self.mesh.r_centers), len(self.mesh.z_centers)), config.INITIAL_TEMP)
+        self.T = np.full((len(self.r_centers), len(self.z_centers)), config.INITIAL_TEMP)
         self.T_old = self.T.copy()
         
         self.net_heat_flow = np.zeros((self.num_r, self.num_z)) # 2D r*z o
@@ -113,7 +114,6 @@ class TubeFurnaceHeatSolver:
         
         # Print initialization summary
         #self._validate_configuration()
-        
         self.setup_complete = True
         
     def _validate_configuration(self):
@@ -250,10 +250,10 @@ class TubeFurnaceHeatSolver:
         # 3. Precompute vectorized fluxes for internal cell for Finite Volume Method (FVM)
         #dT_dr_grid = (self.T[1:, :] - self.T[:-1, :]) / self.dr_minus_grid[1:, :] # 2D r-1*z o(|)o # trimmed <(|)| duplicated unusable 0
         #dT_dz_grid = (self.T[:, :-1] - self.T[:, 1:]) / self.dz_minus_grid[:, 1:] # 2D r*z-1 o(|)o # trimmed <(|)| duplicated unusable 0
-        radial_flux_minus = k_r_grid * self.area_inner_face[1:, :] * (self.T[1:, :] - self.T[:-1, :]) / self.dr_grid[:-1, :] # 2D r-1*z < | Ti - Ti-1
-        radial_flux_plus = k_r_grid * self.area_outer_face[:-1, :] * (self.T[1:, :] - self.T[:-1, :]) / self.dr_grid[1:, :] # 2D r-1*z | > Ti+1 - Ti
-        axial_flux_minus = k_z_grid * self.axial_face_area[:, 1:] * (self.T[:, 1:] - self.T[:, :-1]) / self.dz_grid[:, -1:] # 2D r*z-1 < | Ti - Ti-1
-        axial_flux_plus = k_z_grid * self.axial_face_area[:, :-1] * (self.T[:, 1:] - self.T[:, :-1]) / self.dz_grid[:, :1] # 2D r*z-1 | > Ti+1 - Ti
+        radial_flux_minus = k_r_grid * self.area_inner_face[1:, :] * (self.T[1:, :] - self.T[:-1, :]) / (self.dr1_grid + self.dr2_grid) # 2D r-1*z < | Ti - Ti-1
+        radial_flux_plus = k_r_grid * self.area_outer_face[:-1, :] * (self.T[1:, :] - self.T[:-1, :]) / (self.dr1_grid + self.dr2_grid) # 2D r-1*z | > Ti+1 - Ti
+        axial_flux_minus = k_z_grid * self.axial_face_area[:, 1:] * (self.T[:, 1:] - self.T[:, :-1]) / (self.dz1_grid + self.dz2_grid) # 2D r*z-1 < | Ti - Ti-1
+        axial_flux_plus = k_z_grid * self.axial_face_area[:, :-1] * (self.T[:, 1:] - self.T[:, :-1]) / (self.dz1_grid + self.dz2_grid) # 2D r*z-1 | > Ti+1 - Ti
 
         # 4. Handle Heat source and sink
         
@@ -276,9 +276,10 @@ class TubeFurnaceHeatSolver:
         Q_rad_to_ambient = self.emissivity_casing * config.STEFAN_BOLTZMANN * self.cubic_outer_surface * (self.T_aluminum_casing_avg**4 - config.AMBIENT_TEMP**4)
         
         # 5. Assemble net heat flow and update temperature field
-        self.net_heat_flow[1:-1, 1:-1] = (radial_flux_minus[1:, 1:-1] - radial_flux_plus[:-1, 1:-1] + 
-                                        axial_flux_minus[1:-1, 1:] - axial_flux_plus[1:-1, :-1])
         self.net_heat_flow += self.Q_gen_grid * self.volume
+        self.net_heat_flow[1:-1, :] += radial_flux_minus[1:, :] - radial_flux_plus[:-1, :]
+        self.net_heat_flow[:, 1:-1] += axial_flux_minus[:, 1:] - axial_flux_plus[:, :-1]
+        #self.net_heat_flow += self.radial_flux_minus [0, :] # Boundary conditions for inner radius (r=0) # The radial flux at r=0 is zero due to symmetry.
         self.net_heat_flow -= Q_conv_to_sample_air_space_local
         self.net_heat_flow -= Q_conv_to_air_gap_local + Q_rad_out_reflective_local
         dT_dt_grid = self.net_heat_flow / (rho_matrix * cp_matrix * self.volume)
@@ -290,9 +291,20 @@ class TubeFurnaceHeatSolver:
         self.T_sample_air_space_avg += dT_dt_sample_air_space_avg * self.dt
         self.T_air_gap_avg += dT_dt_air_gap * self.dt
         self.T_aluminum_casing_avg += dT_dt_to_aluminum_casing * self.dt
-    
+        #print(self.T_sample_air_space_avg, self.T_air_gap_avg, self.T_aluminum_casing_avg)
+        pd.DataFrame(radial_flux_minus).to_csv("radial_flux_minus.csv")
+        pd.DataFrame(radial_flux_plus).to_csv("radial_flux_plus.csv")
+        pd.DataFrame(axial_flux_minus).to_csv("axial_flux_minus.csv")
+        pd.DataFrame(axial_flux_plus).to_csv("axial_flux_plus.csv")
+        pd.DataFrame(Q_conv_to_sample_air_space_local).to_csv("Q_conv_to_sample_air_space_local.csv")
+        pd.DataFrame(Q_conv_to_air_gap_local).to_csv("Q_conv_from_air_gap_local.csv")
+        pd.DataFrame(Q_rad_out_reflective_local).to_csv("Q_rad_out_reflective_local.csv")
+        pd.DataFrame(self.net_heat_flow).to_csv("net_heat_flow.csv")
+        pd.DataFrame(dT_dt_grid).to_csv("dT_dt_grid.csv")
         # Update cylindrical temperature field
-        
+        #print(self.T)
+        #print(self.T.shape)
+        pd.DataFrame(self.T).to_csv("T_before_update.csv")
         self.T += dT_dt_grid * self.dt
     
     def solve_heat_equation_hybrid(self):
@@ -370,13 +382,14 @@ class TubeFurnaceHeatSolver:
                     
                     # Update time
                     self.time += self.dt
-                    if step % 1000 == 0:
+                    if step % 1 == 0:
                         # Record data
                         temp_dataset[step] = self.T.astype(np.float32)
                         time_dataset[step] = self.time
                         self.time_history.append(self.time)
                         lumped_temp_dataset[step] = self.T_sample_air_space_avg.astype(np.float32), self.T_air_gap_avg.astype(np.float32), self.T_aluminum_casing_avg.astype(np.float32)
-
+                        #print(lumped_temp_dataset)
+                        #print(self.T_sample_air_space_avg, self.T_air_gap_avg, self.T_aluminum_casing_avg)
                     # Update progress
                     pbar.set_postfix({
                         'Time': f'{self.time/3600:.2f}h',
@@ -402,7 +415,22 @@ class TubeFurnaceHeatSolver:
         if len(self.time_history) == 0:
             print("No simulation data available for visualization")
             return
-        
+        self.Tplot = np.zeros((len(self.mesh.r_nodes)+1, len(self.mesh.z_nodes)-1)) # Add Air gap and Aluminium Casing and Remove the most right facial node, negatively-skewed centered grid
+        self.Tplot[self.mesh.starting_index:-2, :] += self.T
+        if self.mesh.starting_index < 2:
+            self.Tplot[0, :] += self.T_sample_air_space_avg
+        else:
+            self.Tplot[:self.mesh.starting_index - 1, :] += self.T_sample_air_space_avg
+        self.Tplot[-2, :] += self.T_air_gap_avg
+        self.Tplot[-1, :] += self.T_aluminum_casing_avg
+
+        self.r_cubic = []
+        self.r_cubic.extend(self.mesh.r_nodes[:-1])
+        self.r_cubic.append(self.mesh.inner_cubic_shortest_distance)
+        self.r_cubic.append(self.mesh.outer_cubic_shortest_distance)
+        self.r_axis = np.array(self.r_cubic)
+        self.z_axis = self.mesh.z_nodes[:-1]
+        pd.DataFrame(self.Tplot).to_csv("final_temperature_field.csv")
         fig, axes = plt.subplots(2, 3, figsize=(20, 12))
         
         # Convert time to hours
@@ -410,8 +438,8 @@ class TubeFurnaceHeatSolver:
         
         # 2. Current temperature field
         ax2 = axes[0, 1]
-        temp_plot = self.T - 273  # Convert to Celsius
-        im2 = ax2.contourf(self.mesh.Z * 1000, self.mesh.R * 1000, temp_plot, 
+        temp_plot = self.Tplot - 273  # Convert to Celsius
+        im2 = ax2.contourf(self.z_axis * 1000, self.r_axis * 1000, temp_plot, 
                           levels=50, cmap='hot')
         plt.colorbar(im2, ax=ax2, label='Temperature (°C)')
         ax2.set_xlabel('Axial Position (mm)')
@@ -421,8 +449,8 @@ class TubeFurnaceHeatSolver:
         # 3. Radial temperature profile at center
         ax3 = axes[0, 2]
         center_z_idx = len(self.mesh.z_nodes) // 2
-        radial_profile = self.T[:, center_z_idx] - 273
-        ax3.plot(self.mesh.r_nodes * 1000, radial_profile, 'r-', linewidth=3)
+        radial_profile = self.Tplot[:, center_z_idx] - 273
+        ax3.plot(self.r_axis * 1000, radial_profile, 'r-', linewidth=3)
         ax3.set_xlabel('Radial Position (mm)')
         ax3.set_ylabel('Temperature (°C)')
         ax3.set_title('Radial Temperature Profile (Center)')
@@ -431,9 +459,9 @@ class TubeFurnaceHeatSolver:
         
         # 4. Axial temperature profile at heating coil
         ax4 = axes[1, 0]
-        coil_r_idx = np.argmin(np.abs(self.mesh.r_nodes - config.HEATING_COIL_RADIUS))
-        axial_profile = self.T[coil_r_idx, :] - 273
-        ax4.plot(self.mesh.z_nodes * 1000, axial_profile, 'b-', linewidth=3)
+        coil_r_idx = np.argmin(np.abs(self.r_axis - config.HEATING_COIL_RADIUS))
+        axial_profile = self.Tplot[coil_r_idx, :] - 273
+        ax4.plot(self.z_axis * 1000, axial_profile, 'b-', linewidth=3)
         ax4.set_xlabel('Axial Position (mm)')
         ax4.set_ylabel('Temperature (°C)')
         ax4.set_title('Axial Temperature Profile (Heating Coil)')
