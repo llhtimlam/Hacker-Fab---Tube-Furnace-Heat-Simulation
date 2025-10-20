@@ -73,7 +73,7 @@ class TubeFurnaceHeatSolver:
         self.aluminum_casing_mass = self.cubic_aluminium_casing_volume * self.rho_aluminum_casing
         self.emissivity_reflective = self.materials.get_emissivity(self.materials.material_index_to_name[5]) # 5: 'reflective_aluminum'
         self.emissivity_casing = self.materials.get_emissivity(self.materials.material_index_to_name[7]) # 7: 'aluminum_5052'
-        
+
         # Initialized Lump Node Settings
         self.T_sample_air_space_avg = config.INITIAL_TEMP # Future implementation to N2 H2O(g) gas flow
         self.T_air_gap_avg = config.INITIAL_TEMP
@@ -111,9 +111,24 @@ class TubeFurnaceHeatSolver:
         self.Q_gen_grid = self.precompute_heat_source_grid(config) # 2D r*z o
         # Precompute boundary condition grids
         self.boundary_info = self.boundary_data
-        
-        # Print initialization summary
-        #self._validate_configuration()
+        if True:  # For debugging, export initial data
+            self.k_matrix, self.rho_matrix, self.cp_matrix = self.materials.get_thermal_properties_vec(
+            self.materials,
+            self.material_map_cylindrical_centered,
+            self.AMBIENT_TEMP
+            )
+            alpha = self.k_matrix / (self.rho_matrix * self.cp_matrix)
+            #pd.DataFrame(alpha).to_csv("alpha.csv")
+            # CFL condition: dt ≤ dx²/(2α) for 2D
+            if self.mesh.starting_index < 2:
+                alpha = alpha[1:, :]
+            else:
+                alpha = alpha[self.mesh.starting_index - 1:, :]
+            initial_recommended_dt = config.CFL_SAFETY_FACTOR * np.tile(self.dr_centers[1:-1], (self.num_z, 1)).T**2 / (4 * alpha)
+            #pd.DataFrame(initial_recommended_dt).to_csv("initial_recommended_dt.csv")
+            print(f"Initial recommended time step based on CFL condition: {np.min(initial_recommended_dt):.32f} seconds")
+            # Print initialization summary
+            #self._validate_configuration()
         self.setup_complete = True
         
     def _validate_configuration(self):
@@ -208,8 +223,8 @@ class TubeFurnaceHeatSolver:
                 mask_2d[0, :] = True
                 area_values = self.area_inner_face[0, :]
             elif name == "reflective_airgap" or name == "reflective_casing":
-                mask_2d[self.num_r - 1, :] = True
-                area_values = self.area_outer_face[self.num_r - 1, :]
+                mask_2d[-1, :] = True
+                area_values = self.area_outer_face[-1, :]
                         
             # Calculate hA_grid using the 2D boolean mask
             hA_grid = np.zeros((self.num_r, self.num_z))
@@ -263,8 +278,8 @@ class TubeFurnaceHeatSolver:
         hA_rad_out_reflective_grid = boundaries["reflective_casing"]["hA_grid"]
 
         Q_conv_to_sample_air_space_local = hA_conv_to_sample_air_space_local * (self.T - self.T_sample_air_space_avg)
-        Q_conv_to_air_gap_local = hA_conv_to_air_gap_local * (self.T - self.T_air_gap_avg)
-        Q_rad_out_reflective_local = hA_rad_out_reflective_grid * (self.T**4 - self.T_aluminum_casing_avg**4)
+        Q_conv_to_air_gap_local = hA_conv_to_air_gap_local * (self.T_air_gap_avg - self.T)
+        Q_rad_out_reflective_local = hA_rad_out_reflective_grid * (self.T_aluminum_casing_avg**4 - self.T**4)
 
         Q_conv_to_sample_air_space_total = Q_conv_to_sample_air_space_local.sum()
         Q_conv_to_air_gap_total = Q_conv_to_air_gap_local.sum()
@@ -276,12 +291,19 @@ class TubeFurnaceHeatSolver:
         Q_rad_to_ambient = self.emissivity_casing * config.STEFAN_BOLTZMANN * self.cubic_outer_surface * (self.T_aluminum_casing_avg**4 - config.AMBIENT_TEMP**4)
         
         # 5. Assemble net heat flow and update temperature field
+        # Internal Nodes
         self.net_heat_flow += self.Q_gen_grid * self.volume
         self.net_heat_flow[1:-1, :] += radial_flux_minus[1:, :] - radial_flux_plus[:-1, :]
         self.net_heat_flow[:, 1:-1] += axial_flux_minus[:, 1:] - axial_flux_plus[:, :-1]
         #self.net_heat_flow += self.radial_flux_minus [0, :] # Boundary conditions for inner radius (r=0) # The radial flux at r=0 is zero due to symmetry.
-        self.net_heat_flow -= Q_conv_to_sample_air_space_local
-        self.net_heat_flow -= Q_conv_to_air_gap_local + Q_rad_out_reflective_local
+        # Boundary Nodes
+        # Inner Boundary (sample air space convection)
+        self.net_heat_flow +=  Q_conv_to_sample_air_space_local - radial_flux_plus[0, :]
+        self.net_heat_flow[0, 1:-1] += axial_flux_minus[0, 1:] - axial_flux_plus[0, :-1]
+        # Outer Boundary (air gap convection and reflective radiation)
+        self.net_heat_flow += radial_flux_minus[-1, :] - (Q_conv_to_air_gap_local + Q_rad_out_reflective_local)
+        self.net_heat_flow[-1, 1:-1] += axial_flux_minus[-1, 1:] - axial_flux_plus[-1, :-1]
+
         dT_dt_grid = self.net_heat_flow / (rho_matrix * cp_matrix * self.volume)
         
         dT_dt_sample_air_space_avg = Q_conv_to_sample_air_space_total / (sample_air_space_mass * cv_sample_air_space)
@@ -292,19 +314,25 @@ class TubeFurnaceHeatSolver:
         self.T_air_gap_avg += dT_dt_air_gap * self.dt
         self.T_aluminum_casing_avg += dT_dt_to_aluminum_casing * self.dt
         #print(self.T_sample_air_space_avg, self.T_air_gap_avg, self.T_aluminum_casing_avg)
-        pd.DataFrame(radial_flux_minus).to_csv("radial_flux_minus.csv")
-        pd.DataFrame(radial_flux_plus).to_csv("radial_flux_plus.csv")
-        pd.DataFrame(axial_flux_minus).to_csv("axial_flux_minus.csv")
-        pd.DataFrame(axial_flux_plus).to_csv("axial_flux_plus.csv")
-        pd.DataFrame(Q_conv_to_sample_air_space_local).to_csv("Q_conv_to_sample_air_space_local.csv")
-        pd.DataFrame(Q_conv_to_air_gap_local).to_csv("Q_conv_from_air_gap_local.csv")
-        pd.DataFrame(Q_rad_out_reflective_local).to_csv("Q_rad_out_reflective_local.csv")
-        pd.DataFrame(self.net_heat_flow).to_csv("net_heat_flow.csv")
-        pd.DataFrame(dT_dt_grid).to_csv("dT_dt_grid.csv")
+        #print(Q_conv_to_sample_air_space_total, Q_conv_to_air_gap_total, Q_rad_out_reflective_total, Q_conv_from_air_gap_total, Q_conv_to_ambient, Q_rad_to_ambient)
+        if False:  # For debugging, export intermediate data
+            pd.DataFrame(hA_conv_to_sample_air_space_local).to_csv("hA_conv_to_sample_air_space_local.csv")
+            pd.DataFrame(hA_conv_to_air_gap_local).to_csv("hA_conv_to_air_gap_local.csv")
+            pd.DataFrame(hA_rad_out_reflective_grid).to_csv("hA_rad_out_reflective_grid.csv")
+        if False:  # For debugging, export intermediate data
+            pd.DataFrame(radial_flux_minus).to_csv("radial_flux_minus.csv")
+            pd.DataFrame(radial_flux_plus).to_csv("radial_flux_plus.csv")
+            pd.DataFrame(axial_flux_minus).to_csv("axial_flux_minus.csv")
+            pd.DataFrame(axial_flux_plus).to_csv("axial_flux_plus.csv")
+            pd.DataFrame(Q_conv_to_sample_air_space_local).to_csv("Q_conv_to_sample_air_space_local.csv")
+            pd.DataFrame(Q_conv_to_air_gap_local).to_csv("Q_conv_from_air_gap_local.csv")
+            pd.DataFrame(Q_rad_out_reflective_local).to_csv("Q_rad_out_reflective_local.csv")
+            pd.DataFrame(self.net_heat_flow).to_csv("net_heat_flow.csv")
+            pd.DataFrame(dT_dt_grid).to_csv("dT_dt_grid.csv")
+            pd.DataFrame(self.T).to_csv("T_before_update.csv")
         # Update cylindrical temperature field
         #print(self.T)
         #print(self.T.shape)
-        pd.DataFrame(self.T).to_csv("T_before_update.csv")
         self.T += dT_dt_grid * self.dt
     
     def solve_heat_equation_hybrid(self):
@@ -328,14 +356,11 @@ class TubeFurnaceHeatSolver:
             self.T
         )
         # Maximum thermal diffusivity in domain
-        alpha_max = 0.0
-        for i in range(0, len(self.mesh.r_nodes), 3):  # Sample every 3rd node for efficiency
-            for j in range(0, len(self.mesh.z_nodes), 3):  # Sample every 3rd node for efficiencyj]
-                alpha = k_matrix[i, j] / (rho_matrix[i, j] * cp_matrix[i, j])
-                alpha_max = max(alpha_max, alpha)
+        alpha = self.k_matrix / (self.rho_matrix * self.cp_matrix)
+        alpha_max = np.max(alpha)
         
         # CFL condition: dt ≤ dx²/(2α) for 2D
-        dt_cfl = config.CFL_SAFETY_FACTOR * dx_min**2 / (4 * alpha_max)
+        dt_cfl = config.CFL_SAFETY_FACTOR * np.min(self.dr_centers[1:-1])**2 / (4 * alpha_max)
         
         # Apply time step limits
         dt_new = np.clip(dt_cfl, config.MIN_TIME_STEP, config.MAX_TIME_STEP)
@@ -390,14 +415,39 @@ class TubeFurnaceHeatSolver:
                         lumped_temp_dataset[step] = self.T_sample_air_space_avg.astype(np.float32), self.T_air_gap_avg.astype(np.float32), self.T_aluminum_casing_avg.astype(np.float32)
                         #print(lumped_temp_dataset)
                         #print(self.T_sample_air_space_avg, self.T_air_gap_avg, self.T_aluminum_casing_avg)
-                    # Update progress
-                    pbar.set_postfix({
-                        'Time': f'{self.time/3600:.2f}h',
-                        'dt': f'{self.dt:.16f}s',
-                        'T_max': f'{np.max(self.T)-273:.0f}°C',
-                        'Solve': f'{solve_time:.3f}s'
-                    })
-                    pbar.update(1)
+                    if False:  # For checking CFL condition recommendeded dt
+                        if step % 10000 == 0:
+                            k_matrix, rho_matrix, cp_matrix = self.materials.get_thermal_properties_vec(
+                            self.materials,
+                            self.material_map_cylindrical_centered,
+                            self.T
+                            )
+                            alpha = k_matrix / (rho_matrix * cp_matrix)
+                            #pd.DataFrame(alpha).to_csv("alpha.csv")
+                            # CFL condition: dt ≤ dx²/(2α) for 2D
+                            if self.mesh.starting_index < 2:
+                                alpha = alpha[1:, :]
+                            else:
+                                alpha = alpha[self.mesh.starting_index - 1:, :]
+                            initial_recommended_dt = config.CFL_SAFETY_FACTOR * np.tile(self.dr_centers[1:-1], (self.num_z, 1)).T**2 / (4 * alpha)
+                            #pd.DataFrame(initial_recommended_dt).to_csv("initial_recommended_dt.csv")
+                        pbar.set_postfix({
+                            'Time': f'{self.time/60:.2f}min',
+                            'dt': f'{self.dt:.6e}s',
+                            'CFL': f'{np.min(initial_recommended_dt):.6e} seconds',
+                            'T_max': f'{np.max(self.T)-273:.0f}°C',
+                            'Solve': f'{solve_time:.3f}s'
+                        })
+                        pbar.update(1)
+                    else:
+                        # Update progress
+                        pbar.set_postfix({
+                            'Time': f'{self.time/60:.2f}min',
+                            'dt': f'{self.dt:.6e}s',
+                            'T_max': f'{np.max(self.T)-273:.0f}°C',
+                            'Solve': f'{solve_time:.3f}s'
+                        })
+                        pbar.update(1)
                     
                     step += 1
                     self.total_iterations += 1
@@ -430,7 +480,8 @@ class TubeFurnaceHeatSolver:
         self.r_cubic.append(self.mesh.outer_cubic_shortest_distance)
         self.r_axis = np.array(self.r_cubic)
         self.z_axis = self.mesh.z_nodes[:-1]
-        pd.DataFrame(self.Tplot).to_csv("final_temperature_field.csv")
+        if True:  # For debugging, export intermediate data
+            pd.DataFrame(self.Tplot).to_csv("final_temperature_field.csv")
         fig, axes = plt.subplots(2, 3, figsize=(20, 12))
         
         # Convert time to hours

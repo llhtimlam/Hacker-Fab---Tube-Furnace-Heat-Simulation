@@ -110,19 +110,18 @@ Cold Zone (Z=0-25mm) ← Heat Conduction → Heating Zone (Z=25-279mm) ← Heat 
 #### **3. Heat Transfer Mechanisms:**
 
 **A. Conduction (Primary):**
-- **Radial**: Through glass (k=1.2-2.0 W/m·K), cement (k=0.6-1.85 W/m·K), ceramic fiber (k=0.045-0.22 W/m·K)
+- **Radial**: Through glass (k=1.4 W/m·K), cement (k=0.6-1.85 W/m·K), ceramic fiber (k=0.045-0.42 W/m·K)
 - **Axial**: Along glass tube length, distributing heat from coil zone to cold zones
 - **Temperature Dependence**: All thermal conductivities vary with temperature
 
 **B. Convection:**
-- **Inner tube**: Natural convection (h=10 W/m²·K) - sample space to glass
-- **Air gap**: Natural convection (h=15 W/m²·K) - thermal isolation
-- **Outer surface**: Natural convection (h=25 W/m²·K) - enclosure to ambient
+- **Inner tube**: Natural convection (h=5 W/m²·K) - sample space to glass
+- **Air gap**: Natural convection (h=5 W/m²·K) - thermal isolation
+- **Outer surface**: Natural convection (h=10 W/m²·K) - enclosure to ambient
 
 **C. Radiation:**
-- **Glass surface**: High emissivity (ε=0.9) - significant radiation at high temperatures
-- **Ceramic fiber**: High emissivity (ε=0.8) - radiative heat transfer
-- **Reflective casing**: Low emissivity (ε=0.05) - **radiation barrier** (95% reflection)
+- **Glass surface**: High emissivity (ε=0.88-0.94) - significant radiation at high temperatures
+- **Reflective casing**: Low emissivity (ε=0.02-0.05) - **radiation barrier** (95% reflection)
 - **Aluminum enclosure**: Low emissivity (ε=0.05-0.09) - minimal heat loss
 
 #### **4. Heat Losses:**
@@ -135,64 +134,105 @@ Cold Zone (Z=0-25mm) ← Heat Conduction → Heating Zone (Z=25-279mm) ← Heat 
 **Heat Loss Reduction Strategies:**
 - **Ceramic fiber insulation**: 102.3mm thick, very low conductivity (k=0.045-0.22 W/m·K)
 - **Reflective barrier**: 95% radiation reflection, prevents radiative losses
-- **Air gap**: 30mm thermal break, prevents conductive heat bridge
-- **Continuous heating**: 41 positions eliminate cold spots in heating zone
+- **Air gap**: 30mm thermal break, prevents direct leak to ambient atmosphere
 
 ### **Boundary Conditions:**
 
 #### **Inner Boundary (r=0, centerline):**
 ```
 ∂T/∂r = 0  (symmetry condition)
--k(∂T/∂r) = h_conv(T_glass - T_sample)
 Convection to Inner Glass Tube Space
+Q = h·A·(T_glass - T_sample)
+Lump node temperature change regards to heat flux
+dT/dt​ = Q/mCv​
+
+```
+#### **Internal Region (r=0, multi-layer cylinderical region):**
+```
+Conduction across internal cell
+∂T/∂t = 1/ρCv·(​​∂/∂r​(k(T)·∂T∂r​))
+where k(T) at interface is treated with weighted average from interpolated k
+k(T) = 1/((k1/Δr1)+(k2/Δr2))⁻¹
+```
+#### **Heating Zone (Coil positions):**
+```
+480W distributed over 39 positions
+Q = 480W/V_smeared 
+where
+V_smear = π·r2²·r1²·z
+dT/dt​ = V_cell·Q/mCv​
 ```
 #### **Intermediate Boundary (Reflective surface):**
 ```
--k(∂T/∂r) = h_conv(T_surface - T_unknown) + ε·σ(T_surface⁴ - T_unknown⁴)
 Combined convection + radiation across layer (T unknown°C)
+Q = h·A·(T_surf - T_air) + ε·σ·A·(T_surf⁴ - T_casing⁴)
+Lump node temperature change regards to heat flux
+dT/dt​ = Q/mCv​
 ```
 #### **Outer Boundary (enclosure surface):**
 ```
--k(∂T/∂r) = h_conv(T_unknown - T_ambient) + ε·σ(T_unknown⁴ - T_ambient⁴)
 Combined convection + radiation to ambient (25°C)
+Q = h·A·(T_air - T_ambient) + ε·σ·A·(T_casing⁴ - T_ambient⁴)
+Lump node temperature change regards to heat flux
+dT/dt​ = Q/mCv​
 ```
 
-#### **Axial Boundaries (tube ends):**
-```
-Z=0 and Z=304.8mm: Combined convection + radiation to ambient
-```
-
-#### **Heating Zone (Coil positions):**
-```
-Q_coil = 480W distributed over 39 positions
-Power density varies with coil turn spacing
-```
 
 ### **Key Assumptions:**
 
 # Quasi-Steady-State Radiation
-Radiation heat transfer is modeled using a quasi-steady-state grey body approximation, surface emissivity remains constant and radiation exchange reaches steady conditions within each time step.
-Treating radiation only in one direction.
-No absorption and transmitance across layer.
+
+- Radiation heat transfer is modeled using a quasi-steady-state grey body approximation, with constant surface emissivity assumed over time.
+- Radiation exchange is considered to reach steady conditions within each time step, and is decoupled from transient conduction behavior.
+- Only surface-to-surface radiation is modeled; no absorption, scattering, or transmittance occurs through material layers, which are treated as perfectly opaque.
+- The air medium is non-participating in radiation; it does not absorb, emit, or scatter thermal radiation.
+- Back radiation from colder surfaces is neglected, and view factor geometry is not considered, reducing the radiation model to a one-way, unidirectional heat transfer mechanism.
+- No radiation exchange is considered across the multi-layer cylindrical region; thermal conduction is the dominant heat transfer mechanism within the solid structure.
 
 # Perfect Thermal Contact
-No thermal contact resistance is considered between adjacent material layers, interfaces are assumed to be in perfect thermal contact, allowing uninterrupted heat conduction with consistent thermal properties.
+
+- No thermal contact resistance is considered at interfaces between adjacent material layers.
+- Interfaces are assumed to be in perfect thermal contact, allowing continuous and uninterrupted heat conduction across boundaries.
+- Thermal properties are consistent across interfaces, with no temperature drop or discontinuity in heat flux between layers.
 
 # Uniform Coil Heating
-Resistive heating elements (e.g., heating coils) are assumed to have uniform power distribution along their length, resulting in consistent volumetric heat generation within the heating zone.
 
-# Natural Convection Only
-Heat transfer to the environment via convection is assumed to occur under natural convection conditions; no forced airflow or external cooling is applied. No fluid mechanic is considered.
+- Consistent volumetric heat generation is applied uniformly within the designated heating zone.
+- Resistive heating elements (e.g., heating coils) are assumed to produce a uniform radial power distribution along their axial length.
+- The helical geometry of coils and any localized heating effects (e.g., hotspots or concentrated nodes) are neglected, simplifying the model to a spatially uniform heat source.
+- Implementation of Gaussian-distributed heating profiles is reserved for future model versions to capture localized power variations more accurately.
+
+# Simplified Thermal Environment and Convection Modeling
+
+- Convective heat loss is modeled using Newton’s law of cooling, with no external fans or forced airflow; only natural convection is considered.
+- The air domain is treated as a uniform lumped node, which reaches thermal equilibrium quasi-instantaneously within each time step (quasi-steady-state assumption).
+- A fixed, user-defined convective heat-transfer coefficient is used; no empirical correlations or dynamic calculation of 
+h is included.
+- No computational fluid dynamics (CFD) or air movement modeling is performed; airflow and buoyancy effects are not resolved.
+- The thermal response of the air is based on a constant-volume, ideal gas approximation, with thermal diffusivity interpolated at each temperature step.
+- No enthalpy changes (e.g., from phase change or air moisture) are included in the air domain; only sensible heat (via temperature) is considered.
+- No mass flow or heat loss is included within the sample air space, but the framework allows for future integration of pressurized mass flow or open-system behavior.
 
 # Material Homogeneity Within Layers
-Each material layer is assumed to be homogeneous, with isotropic thermal properties. Spatial variation within a single layer is not considered.
+
+- Each material layer is assumed to be homogeneous and isotropic, with uniform thermal properties throughout its volume.
+- Spatial variations in material composition, porosity, or fiber alignment within a single layer are not considered.
+- Localized thermal anomalies (e.g., hot spots, thermal bridges, or short circuits) caused by microstructural inhomogeneities are neglected.
 
 # No Chemical or Phase Reactions
-The model simulates pure heat transfer processes. Effects from chemical reactions (e.g., combustion, oxidation, decomposition) or phase changes (e.g., melting, evaporation) are excluded.
+
+- The model simulates pure heat transfer without coupling to any chemical reactions or material transformations.
+- Effects from air chemistry, oxidation, combustion, pyrolysis, decomposition, or thermal degradation are excluded.
+- Phase changes (e.g., melting, vaporization, condensation) and associated latent heat effects are not modeled.
+- All materials are assumed to remain in their initial solid phase throughout the simulation.
 
 # Adiabatic Axial Boundary (z-axis)
-The furnace is modeled as a segment of an infinitely long cylinder by applying adiabatic boundary conditions at the ends along the z-axis. This setting trace heat propagation in the cold zone and simplifies the domain by neglecting end effects and axial heat loss.
 
+- The furnace is modeled as a segment of an infinitely long cylinder wrapped with finite dimension of heating element. This setting trace heat propagation in the cold zone and simplifies the domain by neglecting end effects and axial heat loss.
+
+- No heat flux is permitted through the axial boundaries. This assumption neglects end effects and simplifies the domain to focus on radial and circumferential heat transfer.
+
+- However, the model allows for some degree of axial temperature profiling within the active heating region, enabling more accurate representation of local gradients while maintaining adiabatic conditions at the boundaries.
 ---
 
 ##  **Installation & Setup**
@@ -206,7 +246,7 @@ cd "Hacker Fab - Tube Furnace Heat Simulation"
 ```
 
 #### **Step 2: Environment & Dependencies**
-```powershell
+```powershell or terminal inside your python IDE
 # Create and activate virtual environment
 python -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -218,7 +258,7 @@ pip install -r requirements.txt
 python -c "import numpy, scipy, matplotlib, plotly, h5py; print('✅ All packages ready')"
 ```
 #### **Step 3: Run Simulation**
-*Type py solver.py in Terminal**
+solver.py
 
 **Package Versions (Conflict-Free):**
 ```
@@ -240,7 +280,7 @@ Tube Furnace Heat Simulation/
 ├── 🧱 materials.py                # 7-layer material properties database
 ├── 🕸️ mesh.py                     # High-resolution mesh generation
 ├── 🧮 solver.py                   # Heat transfer physics solver
-├── 🚀 COMPLETE_SETUP.bat          # One-click installation & launcher
+├── 🚀 COMPLETE_SETUP.bat          # One-click installation & launcher (WiP)
 ├── 📋 requirements.txt            # Optimized dependencies (conflict-free)
 ├── 📖 README.md                   # This documentation
 ├── 📁 .venv/                      # Python virtual environment

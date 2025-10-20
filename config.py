@@ -106,14 +106,14 @@ TOTAL_CYLINDRICAL_NODES = TOTAL_RADIAL_NODES * TOTAL_AXIAL_NODES
 POWER_DENSITY_TREATMENT = "2D_CYLINDRICAL" # Default setting DO NOT CHANGE
 # ==================== HIGH-RESOLUTION TEMPORAL PARAMETERS ====================
 # Time discretization - HIGH RESOLUTION
-SIMULATION_DURATION = 0.000009 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
-TIME_STEP_SECONDS = 0.0001  # 1 second time steps for high temporal resolution
+SIMULATION_DURATION = 0.00009 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
+TIME_STEP_SECONDS = 0.00001  # 1 second time steps for high temporal resolution
 TOTAL_TIME_STEPS = int(SIMULATION_DURATION / TIME_STEP_SECONDS)
 
 # Adaptive time stepping parameters
 MIN_TIME_STEP = 0  # Minimum time increment
 MAX_TIME_STEP = 10000000000  # Maximum time increment
-CFL_SAFETY_FACTOR = 0.8  # Courant-Friedrichs-Lewy condition safety
+CFL_SAFETY_FACTOR = 0.25  # Courant-Friedrichs-Lewy condition safety
 
 # Output frequency
 OUTPUT_FREQUENCY = 60  # Save results every 60 seconds

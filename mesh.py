@@ -104,9 +104,9 @@ class TubeFurnaceMesh:
         # Step 2: Create material mapping
         print("2. Creating material mapping")
         self._create_material_mapping()
-        
-        print("=== MESH GENERATION COMPLETE ===\n")
-        self._print_mesh_summary()
+        if True:  # For debugging, export initial data
+            print("=== MESH GENERATION COMPLETE ===\n")
+            self._print_mesh_summary()
         
     def _generate_cylindrical_region(self):
         """Generate cylindrical mesh for inner components"""
@@ -186,23 +186,24 @@ class TubeFurnaceMesh:
         # Calculate actual node spacing for validation
         cold_zone_spacing_mm = (config.HEATING_COIL_START * 1000) / config.AXIAL_NODES_BEFORE
         heating_zone_spacing_mm = (config.HEATING_COIL_LENGTH * 1000) / config.AXIAL_NODES_HEATING
-        print(f"   Total furnace length: {config.FURNACE_LENGTH*1000:.1f}mm ({config.FURNACE_LENGTH/0.0254:.1f} inches)")
-        print(f"   Heating coil length: {config.HEATING_COIL_LENGTH*1000:.1f}mm ({heating_zone_length_inches:.1f} inches)")
-        print(f"   Cold zones (each): {cold_zone_length_inches:.1f} inches = {cold_zone_length_mm:.1f}mm")
-        print(f"   Cold zone node spacing: {cold_zone_node_spacing:.2f}mm/node ({config.AXIAL_NODES_BEFORE} nodes per cold zone)")
-        print(f"   Coil position: {config.HEATING_COIL_START*1000:.1f}mm to {config.HEATING_COIL_END*1000:.1f}mm")        
-        print(f"   CRITICAL VALIDATION - Heating coil mapping:")
-        print(f"     - Coil turns: {config.HEATING_COIL_TURNS}")
-        print(f"     - Heating nodes: {config.AXIAL_NODES_HEATING}")
-        print(f"     - Mapping ratio: {config.HEATING_COIL_TURNS/config.AXIAL_NODES_HEATING:.3f} (MUST = 1.000)")
-        print(f"   Zone breakdown:")
-        print(f"     - Cold zone 1: 0 to {config.HEATING_COIL_START*1000:.1f}mm ({config.AXIAL_NODES_BEFORE} nodes, {cold_zone_spacing_mm:.2f}mm/node)")
-        print(f"     - Heating zone: {config.HEATING_COIL_START*1000:.1f} to {config.HEATING_COIL_END*1000:.1f}mm ({config.AXIAL_NODES_HEATING} nodes, {heating_zone_spacing_mm:.2f}mm/node)")  
-        print(f"     - Cold zone 2: {config.HEATING_COIL_END*1000:.1f} to {config.FURNACE_LENGTH*1000:.1f}mm ({config.AXIAL_NODES_AFTER} nodes, {cold_zone_spacing_mm:.2f}mm/node)")
-        print(f"   Cylindrical mesh: {len(self.r_nodes)} radial x {len(self.z_nodes)} axial = {len(self.r_nodes) * len(self.z_nodes):,} nodes")
-        print(f"   Radial range: 0 to {self.reflective_outer_radius*1000:.1f}mm")
-        print(f"   Axial range: 0 to {config.FURNACE_LENGTH*1000:.1f}mm (12 inches total)")
-        print(f"   Heating zone: {config.HEATING_COIL_START*1000:.1f} to {config.HEATING_COIL_END*1000:.1f}mm (10 inches)")
+        if True:  # For debugging, export initial data
+            print(f"   Total furnace length: {config.FURNACE_LENGTH*1000:.1f}mm ({config.FURNACE_LENGTH/0.0254:.1f} inches)")
+            print(f"   Heating coil length: {config.HEATING_COIL_LENGTH*1000:.1f}mm ({heating_zone_length_inches:.1f} inches)")
+            print(f"   Cold zones (each): {cold_zone_length_inches:.1f} inches = {cold_zone_length_mm:.1f}mm")
+            print(f"   Cold zone node spacing: {cold_zone_node_spacing:.2f}mm/node ({config.AXIAL_NODES_BEFORE} nodes per cold zone)")
+            print(f"   Coil position: {config.HEATING_COIL_START*1000:.1f}mm to {config.HEATING_COIL_END*1000:.1f}mm")        
+            print(f"   CRITICAL VALIDATION - Heating coil mapping:")
+            print(f"     - Coil turns: {config.HEATING_COIL_TURNS}")
+            print(f"     - Heating nodes: {config.AXIAL_NODES_HEATING}")
+            print(f"     - Mapping ratio: {config.HEATING_COIL_TURNS/config.AXIAL_NODES_HEATING:.3f} (MUST = 1.000)")
+            print(f"   Zone breakdown:")
+            print(f"     - Cold zone 1: 0 to {config.HEATING_COIL_START*1000:.1f}mm ({config.AXIAL_NODES_BEFORE} nodes, {cold_zone_spacing_mm:.2f}mm/node)")
+            print(f"     - Heating zone: {config.HEATING_COIL_START*1000:.1f} to {config.HEATING_COIL_END*1000:.1f}mm ({config.AXIAL_NODES_HEATING} nodes, {heating_zone_spacing_mm:.2f}mm/node)")  
+            print(f"     - Cold zone 2: {config.HEATING_COIL_END*1000:.1f} to {config.FURNACE_LENGTH*1000:.1f}mm ({config.AXIAL_NODES_AFTER} nodes, {cold_zone_spacing_mm:.2f}mm/node)")
+            print(f"   Cylindrical mesh: {len(self.r_nodes)} radial x {len(self.z_nodes)} axial = {len(self.r_nodes) * len(self.z_nodes):,} nodes")
+            print(f"   Radial range: 0 to {self.reflective_outer_radius*1000:.1f}mm")
+            print(f"   Axial range: 0 to {config.FURNACE_LENGTH*1000:.1f}mm (12 inches total)")
+            print(f"   Heating zone: {config.HEATING_COIL_START*1000:.1f} to {config.HEATING_COIL_END*1000:.1f}mm (10 inches)")
 
     def _create_material_mapping(self):
         """Create material mapping for both regions"""
