@@ -2,6 +2,7 @@
 
 Currently Working File:
 config.py
+hyperbolic.py
 material.py
 mesh.py
 requirements.txt
@@ -13,54 +14,6 @@ A customized heat simulation model developed for small-scale tube furnaces, wher
 
 This hybrid model combines a pseudo-3D/2D cylindrical Finite Volume Method (FVM) with a Lumped Element approach, optimizing both computational efficiency and physical accuracy.
 
-# Key Features
-
-# Comprehensive Heat Transfer Modeling
-
-- Models conduction, convection, and radiation heat transfer mechanisms.
-
-Supports various boundary conditions:
-
-- Dirichlet (Fixed Temperature)
-- Neumann (Fixed Heat Flux)
-- Robin (Convective/Radiative Heat Transfer)
-
-- Surface emissivity, convective coefficients, and ambient conditions are fully configurable.
-
-# Hybrid Numerical Modeling
-
-- Spatially resolved finite volume discretization in cylindrical and annular domains.
-
-- Integrated with lumped-element thermal modeling for components where full spatial resolution is unnecessary.
-
-- Supports axisymmetric configurations with scalable radial and axial resolution.
-
-# CFL Condition Bypass
-
-- Explicit handling of time step constraints to avoid CFL limitations.
-
-- Allows relatively large, and practical time steps while maintaining numerical stability.
-
-- Adjustable mesh density for tailored spatial resolution and computational cost.
-
-# Flexible Geometry Configuration
-
-- Supports solid and multi-layered hollow cylindrical geometries.
-
-- Fully customizable dimensions, mesh granularity, and layer configurations.
-
-- Material properties can be defined as constants or functions of temperature (with interpolation support).
-
-- Configurable internal heat generation for simulating resistive heating, chemical reactions, or other volumetric sources.
-
-# Target Applications
-
-- Simulation of thermal profiles in custom or small-scale tube furnaces.
-
-- Prototyping and virtual testing of heating profiles in laboratory-scale reactors.
-
-- Modeling of thermal response in high-temperature material processing environments.
-
 ## Current System: **Pseudo-3D/2D Cylindrical 5-Layer Tube Furnace System Design**
 
 This simulation models a **5-layer concentric tube furnace system** with precise heat transfer physics:
@@ -68,14 +21,14 @@ This simulation models a **5-layer concentric tube furnace system** with precise
 ### **Layer Structure (from center outward):**
 
 ```
-Layer 1: AIR (Sample Space)          │ r = 0 → mm
-Layer 2: QUARTZ GLASS                │ r = mm → mm
-Layer 3: ANTHAL COIL (embedded)      │ r = mm → mm  (heating zone)
-Layer 4: IMPERIAL CEMENT             │ r = mm → mm
-Layer 5: LYRUFEXON CERAMIC FIBER     │ r = mm → mm
-Layer 6: REFLECTIVE ALUMINUM CASING  │ r = mm → mm
-Layer 7: SEALED AIR GAP              │ r = mm → mm
-Layer 7: ALUMINUM 5052               │ r = mm → mm
+Layer 1: AIR (Sample Space)          │ r = 0 → 10.9982mm                     (10.9982mm)
+Layer 2: QUARTZ GLASS                │ r = 10.9982mm → 12.7mm                (1.7018mm)
+Layer 3: KANTHAL COIL (embedded)     │ r = 12.7mm → 12.955mm  (heating zone) (0.2550mm)
+Layer 4: IMPERIAL CEMENT             │ r = 12.955mm → 15.7mm                 (2.7450mm)
+Layer 5: LYRUFEXON CERAMIC FIBER     │ r = 15.7mm → 117.5mm                  (101.8mm)
+Layer 6: REFLECTIVE ALUMINUM CASING  │ r = 117.5mm → 118.5mm                 (1mm)
+Layer 7: SEALED AIR GAP              │ r = 118.5mm → 148.5mm                 (30mm)
+Layer 7: ALUMINUM 5052-H32           │ r = 148.5mm → 151.5mm                 (3mm)
 ```
 
 ### **Heat Transfer Flow Analysis:**
@@ -176,7 +129,53 @@ Q = h·A·(T_air - T_ambient) + ε·σ·A·(T_casing⁴ - T_ambient⁴)
 Lump node temperature change regards to heat flux
 dT/dt​ = Q/mCv​
 ```
+# Key Features
 
+# Comprehensive Heat Transfer Modeling
+
+- Models conduction, convection, and radiation heat transfer mechanisms.
+
+Supports various boundary conditions:
+
+- Dirichlet (Fixed Temperature)
+- Neumann (Fixed Heat Flux)
+- Robin (Convective/Radiative Heat Transfer)
+
+- Surface emissivity, convective coefficients, and ambient conditions are fully configurable.
+
+# Hybrid Numerical Modeling
+
+- Spatially resolved finite volume discretization in cylindrical and annular domains.
+
+- Integrated with lumped-element thermal modeling for components where full spatial resolution is unnecessary.
+
+- Supports axisymmetric configurations with scalable radial and axial resolution.
+
+# CFL Condition Bypass
+
+- Explicit handling of time step constraints to avoid CFL limitations.
+
+- Allows relatively large, and practical time steps while maintaining numerical stability.
+
+- Adjustable mesh density for tailored spatial resolution and computational cost.
+
+# Flexible Geometry Configuration
+
+- Supports solid and multi-layered hollow cylindrical geometries.
+
+- Fully customizable dimensions, mesh granularity, and layer configurations.
+
+- Material properties can be defined as constants or functions of temperature (with interpolation support).
+
+- Configurable internal heat generation for simulating resistive heating, chemical reactions, or other volumetric sources.
+
+# Target Applications
+
+- Simulation of thermal profiles in custom or small-scale tube furnaces.
+
+- Prototyping and virtual testing of heating profiles in laboratory-scale reactors.
+
+- Modeling of thermal response in high-temperature material processing environments.
 
 ### **Key Assumptions:**
 
@@ -277,6 +276,7 @@ plotly>=5.0.0
 Tube Furnace Heat Simulation/
 ├── 
 ├── ⚙️ config.py                   # System configuration parameters
+├──   hyperbolic.py                # Optimize Mesh Spacing
 ├── 🧱 materials.py                # 7-layer material properties database
 ├── 🕸️ mesh.py                     # High-resolution mesh generation
 ├── 🧮 solver.py                   # Heat transfer physics solver
@@ -322,18 +322,63 @@ All materials in `materials.py` must have temperature-dependent properties:
 - Specific heat cp(T) 
 - Density ρ(T)
 
-Support interpolation with cubic interpolating that can be customized
+Support interpolation for temperature dependent properties
 
 ### **Mesh Geometry:**
 
-Edit `mesh.py` for editing mesh spatial geometry
+Review `mesh.py` for mesh spatial geometry
 
-##  **Simulation Output**
+Edit `hyperbolic.py` for optimizing number of node with hyperbolic tangent spacing (S curve, fine in edge and coarse in middle)
 
-### ** Main Output: h5.file and np.plot diagram**
+Run `hyperbolic.py`, if detailed result is needed, toggle Debug Mode in Config.py for exporting the Hyperbolic Spacing Grid
 
-Run `solver.py` 
+Located in Debug folder
+
+##  **Simulation Workflow Overview**
+
+1. Edit config.py, materials.py for desired setting
+
+2. Toggle Import/Export Mode in Config.py
+
+If Import Mode = False in config.py
+Mesh will be generated based on config.py setting and skip to next step
+
+If Import Mode = True in config.py
+Ensure the following files are placed in Import folder and make sure config.py and materials.py is identical to previous run:
+r_centers.csv    r_faces.csv
+z_centers.csv    z_faces.csv
+Cylindrical Region Final Step Temperature.csv
+material_map_cylindrical_centered.csv
+
+3. Run `solver.py`
+
+If Import Mode = True:
+Type based on the prompted in the terminal for Lump Node Region Temperature Setup
+where it can be retrieved in any column in the Tplot.csv:
+Sample Air Space Temperature    1st row       (index 0)
+Air Gap Temperature             last 2nd row  (index -1)
+Aluminium Casing Temperature    last row      (index -2)
+
+4. Output Results
+
+Main Output:
+Located in Solver Graphics and Data folder
+h5.file contains all time data and png.file transient profile at last iteration
+
+Optional Output:
+Export folder for future import as a checkpoint (Backup config.py and materials.py)
+Debug folder for tracing heat flux and detailed thermal data
 
 **Last Updated**: October 2025  
 **Project Status**:  **WIP**
 **Dependencies**:  **Conflict-Free** - Tested package versions
+
+### **Future Implementation
+
+Research Implicit Method
+Implement Steady State Analysis
+Implement mass flow simulation in sample air space
+Modify radiation model
+Fix graphic for better illustration of node layout
+Improve modularity of each file
+Revamp the code in C environment

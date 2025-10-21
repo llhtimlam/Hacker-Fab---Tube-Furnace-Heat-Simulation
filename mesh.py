@@ -95,16 +95,16 @@ class TubeFurnaceMesh:
         
     def generate_complete_mesh(self):
         """Generate the complete mesh following physical structure"""
-        print("\n=== GENERATING CORRECT TUBE FURNACE MESH ===")
+        #print("\n=== GENERATING CORRECT TUBE FURNACE MESH ===")
         
         # Step 1: Generate cylindrical region (inner components)
-        print("1. Generating CYLINDRICAL region (sample -> reflective aluminium)")
+        #print("1. Generating CYLINDRICAL region (sample -> reflective aluminium)")
         self._generate_cylindrical_region()
                
         # Step 2: Create material mapping
-        print("2. Creating material mapping")
+        #print("2. Creating material mapping")
         self._create_material_mapping()
-        if True:  # For debugging, export initial data
+        if False:  # For debugging, export initial data
             print("=== MESH GENERATION COMPLETE ===\n")
             self._print_mesh_summary()
         
@@ -124,25 +124,47 @@ class TubeFurnaceMesh:
             r_sample = np.linspace(0, self.sample_radius, config.RADIAL_NODES_SAMPLE, endpoint=True)[:-1]
             r_node.extend(r_sample)
 
-        # Layer 2: Glass tube (sample_radius to glass_outer_radius)  
-        r_glass = np.linspace(self.sample_radius, self.glass_outer_radius, config.RADIAL_NODES_GLASS, endpoint=True)[:-1]
-        r_node.extend(r_glass) # Exclude overlap with next layer
-        
-        # Layer 2: Furnace cement AND Kanthal heating element (glass_outer to kanthal_outer)
-        r_kanthal_cement = np.linspace(self.glass_outer_radius, self.kanthal_outer_radius, config.RADIAL_NODES_KANTHAL, endpoint=True)
-        r_node.extend(r_kanthal_cement) # Required at least 2 point to find center
+        if config.ENABLE_HYPERBOLIC_MESH:
+            # Layer 2: Glass tube (sample_radius to glass_outer_radius)  
+            r_glass = self.create_hyperbolic_grid(self.sample_radius, self.glass_outer_radius, config.RADIAL_NODES_GLASS, config.GLASS_STRETCH_FACTOR)[:-1]
+            r_node.extend(r_glass) # Exclude overlap with next layer
+            
+            # Layer 3: Furnace cement AND Kanthal heating element (glass_outer to kanthal_outer)
+            r_kanthal_cement = np.linspace(self.glass_outer_radius, self.kanthal_outer_radius, config.RADIAL_NODES_KANTHAL, endpoint=True)
+            r_node.extend(r_kanthal_cement) # Required at least 2 point to find center
 
-        # Layer 3: Furnace cement (glass_outer to cement_outer)
-        r_cement = np.linspace(self.kanthal_outer_radius, self.cement_outer_radius, config.RADIAL_NODES_CEMENT, endpoint=True)[1:-1]
-        r_node.extend(r_cement) # Exclude overlap with next and previous layer
-        
-        # Layer 4: Ceramic wool (cement_outer to ceramic_outer)
-        r_ceramic = np.linspace(self.cement_outer_radius, self.ceramic_outer_radius, config.RADIAL_NODES_CERAMIC, endpoint=True)[:-1]
-        r_node.extend(r_ceramic) # Exclude overlap with next layer
-        
-        # Layer 5: Reflective aluminium (ceramic_outer to reflective_outer)
-        r_reflective = np.linspace(self.ceramic_outer_radius, self.reflective_outer_radius, config.RADIAL_NODES_REFLECTIVE, endpoint=True)
-        r_node.extend(r_reflective) # Required at least 2 point to find center
+            # Layer 3: Furnace cement (glass_outer to cement_outer)
+            r_cement = self.create_hyperbolic_grid(self.kanthal_outer_radius, self.cement_outer_radius, config.RADIAL_NODES_CEMENT, config.CEMENT_STRETCH_FACTOR)[1:-1]
+            r_node.extend(r_cement) # Exclude overlap with next and previous layer
+            
+            # Layer 4: Ceramic wool (cement_outer to ceramic_outer)
+            r_ceramic = self.create_hyperbolic_grid(self.cement_outer_radius, self.ceramic_outer_radius, config.RADIAL_NODES_CERAMIC, config.CERAMIC_STRETCH_FACTOR)[:-1]
+            r_node.extend(r_ceramic) # Exclude overlap with next layer
+            
+            # Layer 5: Reflective aluminium (ceramic_outer to reflective_outer)
+            r_reflective = np.linspace(self.ceramic_outer_radius, self.reflective_outer_radius, config.RADIAL_NODES_REFLECTIVE, endpoint=True)
+            r_node.extend(r_reflective) # Required at least 2 point to find center
+            
+        else:
+            # Layer 2: Glass tube (sample_radius to glass_outer_radius)  
+            r_glass = np.linspace(self.sample_radius, self.glass_outer_radius, config.RADIAL_NODES_GLASS, endpoint=True)[:-1]
+            r_node.extend(r_glass) # Exclude overlap with next layer
+            
+            # Layer 3: Furnace cement AND Kanthal heating element (glass_outer to kanthal_outer)
+            r_kanthal_cement = np.linspace(self.glass_outer_radius, self.kanthal_outer_radius, config.RADIAL_NODES_KANTHAL, endpoint=True)
+            r_node.extend(r_kanthal_cement) # Required at least 2 point to find center
+
+            # Layer 3: Furnace cement (glass_outer to cement_outer)
+            r_cement = np.linspace(self.kanthal_outer_radius, self.cement_outer_radius, config.RADIAL_NODES_CEMENT, endpoint=True)[1:-1]
+            r_node.extend(r_cement) # Exclude overlap with next and previous layer
+            
+            # Layer 4: Ceramic wool (cement_outer to ceramic_outer)
+            r_ceramic = np.linspace(self.cement_outer_radius, self.ceramic_outer_radius, config.RADIAL_NODES_CERAMIC, endpoint=True)[:-1]
+            r_node.extend(r_ceramic) # Exclude overlap with next layer
+            
+            # Layer 5: Reflective aluminium (ceramic_outer to reflective_outer)
+            r_reflective = np.linspace(self.ceramic_outer_radius, self.reflective_outer_radius, config.RADIAL_NODES_REFLECTIVE, endpoint=True)
+            r_node.extend(r_reflective) # Required at least 2 point to find center
         
         self.r_nodes = np.unique(r_node)
         
@@ -186,7 +208,7 @@ class TubeFurnaceMesh:
         # Calculate actual node spacing for validation
         cold_zone_spacing_mm = (config.HEATING_COIL_START * 1000) / config.AXIAL_NODES_BEFORE
         heating_zone_spacing_mm = (config.HEATING_COIL_LENGTH * 1000) / config.AXIAL_NODES_HEATING
-        if True:  # For debugging, export initial data
+        if False:  # For debugging, export initial data
             print(f"   Total furnace length: {config.FURNACE_LENGTH*1000:.1f}mm ({config.FURNACE_LENGTH/0.0254:.1f} inches)")
             print(f"   Heating coil length: {config.HEATING_COIL_LENGTH*1000:.1f}mm ({heating_zone_length_inches:.1f} inches)")
             print(f"   Cold zones (each): {cold_zone_length_inches:.1f} inches = {cold_zone_length_mm:.1f}mm")
@@ -247,6 +269,14 @@ class TubeFurnaceMesh:
         # Verify that no nodes were missed (e.g., still have -1)
         if (self.material_map_cylindrical_centered == -1).any():
             print("Warning: Some mesh nodes were not assigned a material.")
+
+    def create_hyperbolic_grid(self, start, end, num_points, stretch_factor):
+        """Generates a grid stretched towards the start point using hyperbolic tangent."""
+        linear_space = np.linspace(0, 1, num_points)
+        L = end - start
+        stretched_space = 0.5 * (1 - np.tanh(stretch_factor * (1 - 2 * linear_space)) / np.tanh(stretch_factor))
+        grid = start + L * stretched_space
+        return grid
     
     def _print_mesh_summary(self):
         """Print comprehensive mesh summary"""

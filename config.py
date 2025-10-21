@@ -64,17 +64,27 @@ TARGET_TEMP = 1000 + 273.15  # 1273.15 K (1000°C) target
 MAX_OPERATING_TEMP = 1500 + 273.15  # 1773.15 K (1500°C) max
 
 # ==================== MESH PARAMETERS - ADAPTED FOR NEW MESH SYSTEM ====================
-
 # ========== CUSTOMIZABLE RADIAL DISCRETIZATION ==========
 # NEGATIVELY-BIASED FACIAL RADIAL NODE GENERATION for CELL-CENTERED FINITE VOLUME METHOD - Only applies to CYLINDRICAL region
 # These can be modified to adjust mesh density in high-temperature regions
 # Please keep in mind of dr for stability criteria for Courant–Friedrichs–Lewy (CFL) condition dt <= K * dr^2 / (2*alpha)
 RADIAL_NODES_SAMPLE = 1      # Placeholder for sample region (single node) PREFER SET TO 1, only for display usage
-RADIAL_NODES_GLASS = 3       # High resolution for accurate depiction of thermal gradient in glass layer
+RADIAL_NODES_GLASS = 6       # High resolution for accurate depiction of thermal gradient in glass layer
 RADIAL_NODES_KANTHAL = 2     # Heating coil center location mapping (single node) MUST SET TO > 1
-RADIAL_NODES_CEMENT = 6      # High resolution for accurate depiction of thermal gradient in cement layer
-RADIAL_NODES_CERAMIC = 41    # Moderate resolution to reduce rounding errors in insulation layer
-RADIAL_NODES_REFLECTIVE = 2  # Reflective casing center location mapping (single node) MUST SET TO > 1
+RADIAL_NODES_CEMENT = 9      # High resolution for accurate depiction of thermal gradient in cement layer
+RADIAL_NODES_CERAMIC = 212    # Moderate resolution to reduce rounding errors in insulation layer
+RADIAL_NODES_REFLECTIVE = 5  # Reflective casing center location mapping (single node) MUST SET TO > 1
+#Tested linear setting for dr1 dr2 ~ 0.1275mm
+# 8 2 12 390 5
+# Hyperbolic tangent grid stretching factors for each layer
+  # Adjust this factor to control the skewness for hyperbolic tangent grid in cement layer # fine in edge and gradually coarser in center
+ENABLE_HYPERBOLIC_MESH = True
+GLASS_STRETCH_FACTOR = 1.05 
+CEMENT_STRETCH_FACTOR = 1.05
+CERAMIC_STRETCH_FACTOR = 1.05
+REFLECTIVE_STRETCH_FACTOR = 1.05 # Not used, compression ratio < 1
+# Stretch factor 1.05, 6 9 212
+# Optimized by \(r_{i}=\frac{L}{2}\left[1-\frac{\tanh (\beta (1-2s_{i}))}{\tanh (\beta )}\right]+\text{start}\)
 
 # Note: Air gap and aluminum enclosure use CUBIC mesh system (not radial discretization)
 
@@ -102,12 +112,15 @@ TOTAL_AXIAL_NODES = AXIAL_NODES_BEFORE + AXIAL_NODES_HEATING + AXIAL_NODES_AFTER
 # Cylindrical region: Complete structured mesh
 TOTAL_CYLINDRICAL_NODES = TOTAL_RADIAL_NODES * TOTAL_AXIAL_NODES
 
-# ==================== SIMULATION GEOMETRY ====================
+# ==================== SIMULATION SETTINGS ====================
 POWER_DENSITY_TREATMENT = "2D_CYLINDRICAL" # Default setting DO NOT CHANGE
+IMPORT_MODE = False # Allow direct simulation for imported data from previous runs
+EXPORT_MODE = True # Allow export of intermediate data for analysis and future import in solver.py
+DEBUG_MODE = True  # Enable debug mode for detailed logging
 # ==================== HIGH-RESOLUTION TEMPORAL PARAMETERS ====================
 # Time discretization - HIGH RESOLUTION
-SIMULATION_DURATION = 0.00009 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
-TIME_STEP_SECONDS = 0.00001  # 1 second time steps for high temporal resolution
+SIMULATION_DURATION = 0.000000006 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
+TIME_STEP_SECONDS = 0.00000001  # 1 second time steps for high temporal resolution
 TOTAL_TIME_STEPS = int(SIMULATION_DURATION / TIME_STEP_SECONDS)
 
 # Adaptive time stepping parameters
@@ -164,11 +177,14 @@ NODE_SPACING = HEATING_COIL_LENGTH / (AXIAL_NODES_HEATING - 1) if AXIAL_NODES_HE
 #assert abs(COIL_SPACING - NODE_SPACING) < 1e-10, f"Spacing mismatch: coil={COIL_SPACING:.6f}, node={NODE_SPACING:.6f}"
 
 # ==================== OUTPUT SETTINGS ====================
-OUTPUT_DIR = 'high_res_results'
+INPUT_DIR = "Import folder"
+EXPORT_DIR = "Exported folder"
+OUTPUT_DIR = 'Solver Graphics and Data'
+
 MESH_OUTPUT_FILE = 'mesh_details.txt'
-TEMPERATURE_OUTPUT_FILE = 'temperature_evolution.h5'  # HDF5 for large datasets
 VISUALIZATION_DIR = 'visualizations'
 LOG_FILE = 'simulation_log.txt'
+DEBUG_DIR = 'Debug folder'
 
 # Function to get exact node count from mesh generation
 def get_exact_node_count():
