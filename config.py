@@ -59,7 +59,7 @@ ENCLOSURE_TYPE = "Cubic Aluminum 5052-H32 Box Enclosure"
 
 # ==================== TEMPERATURE CONDITIONS ====================
 AMBIENT_TEMP = 25 + 273.15  # 298.15 K (25°C)
-INITIAL_TEMP = AMBIENT_TEMP  # Start at ambient
+INITIAL_TEMP = 60 + 273.15  # Start at 60°C to avoid numerical issues
 TARGET_TEMP = 1000 + 273.15  # 1273.15 K (1000°C) target
 MAX_OPERATING_TEMP = 1500 + 273.15  # 1773.15 K (1500°C) max
 
@@ -69,11 +69,11 @@ MAX_OPERATING_TEMP = 1500 + 273.15  # 1773.15 K (1500°C) max
 # These can be modified to adjust mesh density in high-temperature regions
 # Please keep in mind of dr for stability criteria for Courant–Friedrichs–Lewy (CFL) condition dt <= K * dr^2 / (2*alpha)
 RADIAL_NODES_SAMPLE = 1      # Placeholder for sample region (single node) PREFER SET TO 1, only for display usage
-RADIAL_NODES_GLASS = 6       # High resolution for accurate depiction of thermal gradient in glass layer
-RADIAL_NODES_KANTHAL = 2     # Heating coil center location mapping (single node) MUST SET TO > 1
-RADIAL_NODES_CEMENT = 9      # High resolution for accurate depiction of thermal gradient in cement layer
-RADIAL_NODES_CERAMIC = 212    # Moderate resolution to reduce rounding errors in insulation layer
-RADIAL_NODES_REFLECTIVE = 5  # Reflective casing center location mapping (single node) MUST SET TO > 1
+RADIAL_NODES_GLASS = 8       # High resolution for accurate depiction of thermal gradient in glass layer
+RADIAL_NODES_KANTHAL = 3     # Heating coil center location mapping (single node) MUST SET TO > 1
+RADIAL_NODES_CEMENT = 11      # High resolution for accurate depiction of thermal gradient in cement layer
+RADIAL_NODES_CERAMIC = 316    # Moderate resolution to reduce rounding errors in insulation layer
+RADIAL_NODES_REFLECTIVE = 6 # Reflective casing center location mapping (single node) MUST SET TO > 1
 #Tested linear setting for dr1 dr2 ~ 0.1275mm
 # 8 2 12 390 5
 # Hyperbolic tangent grid stretching factors for each layer
@@ -84,6 +84,8 @@ CEMENT_STRETCH_FACTOR = 1.05
 CERAMIC_STRETCH_FACTOR = 1.05
 REFLECTIVE_STRETCH_FACTOR = 1.05 # Not used, compression ratio < 1
 # Stretch factor 1.05, 6 9 212
+# Kanthal 3 node, 8, 11, 316, 6 (Uniform: 10, 16, 599)
+# Kanthal 5 node, 12, 17, 524, 10 (Uniform: 17, 27, 998)
 # Optimized by \(r_{i}=\frac{L}{2}\left[1-\frac{\tanh (\beta (1-2s_{i}))}{\tanh (\beta )}\right]+\text{start}\)
 
 # Note: Air gap and aluminum enclosure use CUBIC mesh system (not radial discretization)
@@ -119,8 +121,8 @@ EXPORT_MODE = True # Allow export of intermediate data for analysis and future i
 DEBUG_MODE = True  # Enable debug mode for detailed logging
 # ==================== HIGH-RESOLUTION TEMPORAL PARAMETERS ====================
 # Time discretization - HIGH RESOLUTION
-SIMULATION_DURATION = 0.000000006 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
-TIME_STEP_SECONDS = 0.00000001  # 1 second time steps for high temporal resolution
+SIMULATION_DURATION = 0.0000009 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
+TIME_STEP_SECONDS = 0.0001  # 1 second time steps for high temporal resolution
 TOTAL_TIME_STEPS = int(SIMULATION_DURATION / TIME_STEP_SECONDS)
 
 # Adaptive time stepping parameters

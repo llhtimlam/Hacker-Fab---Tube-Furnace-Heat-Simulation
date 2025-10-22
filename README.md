@@ -1,4 +1,4 @@
-# Tube Furnace Heat Simulation(WIP)
+# Tube Furnace Heat Simulation(Functional)
 
 Currently Working File:
 config.py
@@ -6,7 +6,7 @@ hyperbolic.py
 material.py
 mesh.py
 requirements.txt
-solver.py (graphic function is not fully implemented)
+solver.py
 
 # Pseudo-3D/2D Cylindrical Finite Volume Method (FVM) – Lumped Element Model Hybrid Heat Simulater
 
@@ -276,7 +276,7 @@ plotly>=5.0.0
 Tube Furnace Heat Simulation/
 ├── 
 ├── ⚙️ config.py                   # System configuration parameters
-├──   hyperbolic.py                # Optimize Mesh Spacing
+├── 📈 hyperbolic.py               # Optimize Mesh Spacing
 ├── 🧱 materials.py                # 7-layer material properties database
 ├── 🕸️ mesh.py                     # High-resolution mesh generation
 ├── 🧮 solver.py                   # Heat transfer physics solver
@@ -338,6 +338,8 @@ Located in Debug folder
 
 1. Edit config.py, materials.py for desired setting
 
+Make sure Initial Temperature Kanthal > Cylindrical Region > Lump Node to avoid starting point numerical instability
+
 2. Toggle Import/Export Mode in Config.py
 
 If Import Mode = False in config.py
@@ -370,7 +372,7 @@ Export folder for future import as a checkpoint (Backup config.py and materials.
 Debug folder for tracing heat flux and detailed thermal data
 
 **Last Updated**: October 2025  
-**Project Status**:  **WIP**
+**Project Status**:  **Functional, WIP for extra feature**
 **Dependencies**:  **Conflict-Free** - Tested package versions
 
 ### **Future Implementation

@@ -133,5 +133,5 @@ if __name__ == "__main__":
     test_instance = Test()
     
     # Call the method from the instance
-    test_instance.runtest2()
+    test_instance.runtest3()
     #test_instance.find_num_nodes_for_stretch(0.0157, 0.1175, 0.0001275*2, 1.05, 200)

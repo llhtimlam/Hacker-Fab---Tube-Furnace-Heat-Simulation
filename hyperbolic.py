@@ -14,7 +14,7 @@ class HyperbolicGridGenerator:
         self.ceramic_outer_radius = config.INSULATION_OUTER_RADIUS
         self.reflective_outer_radius = config.REFLECTIVE_CASING_OUTER_RADIUS
 
-        self.target_radius = config.HEATING_COIL_WIRE_DIAMETER/2
+        self.target_radius = config.HEATING_COIL_WIRE_DIAMETER/config.RADIAL_NODES_KANTHAL
         # Optimizing each layer
         self.glass_grid, self.glass_num_nodes, self.glass_minmax_ratio, self.glass_min_dr, self.glass_max_dr, self.glass_min_diff_dr, self.glass_max_diff_dr = self.find_num_nodes_for_stretch(self.sample_radius, self.glass_outer_radius, self.target_radius, config.GLASS_STRETCH_FACTOR)
         self.cement_grid, self.cement_num_nodes, self.cement_minmax_ratio, self.cement_min_dr, self.cement_max_dr, self.cement_min_diff_dr, self.cement_max_diff_dr = self.find_num_nodes_for_stretch(self.kanthal_outer_radius, self.cement_outer_radius, self.target_radius, config.CEMENT_STRETCH_FACTOR)
@@ -128,10 +128,10 @@ class HyperbolicGridGenerator:
         print(f"without hyperbolic stretching: {self.total_nodes_without_stretching_without_reflective}")
         print(f"Compression Ratio: {self.total_compression_ratio_without_reflective:.4f}")
         if config.DEBUG_MODE:
-            pd.DataFrame(self.glass_grid).to_csv(os.path.join(config.DEBUG_DIR, "glass_grid.csv"), index=False)
-            pd.DataFrame(self.cement_grid).to_csv(os.path.join(config.DEBUG_DIR, "cement_grid.csv"), index=False)
-            pd.DataFrame(self.ceramic_grid).to_csv(os.path.join(config.DEBUG_DIR, "ceramic_grid.csv"), index=False)
-            pd.DataFrame(self.reflective_grid).to_csv(os.path.join(config.DEBUG_DIR, "reflective_grid.csv"), index=False)
+            pd.DataFrame(self.glass_grid).to_csv(os.path.join(config.DEBUG_DIR, "hyperbolic_glass_grid.csv"), index=False)
+            pd.DataFrame(self.cement_grid).to_csv(os.path.join(config.DEBUG_DIR, "hyperbolic_cement_grid.csv"), index=False)
+            pd.DataFrame(self.ceramic_grid).to_csv(os.path.join(config.DEBUG_DIR, "hyperbolic_ceramic_grid.csv"), index=False)
+            pd.DataFrame(self.reflective_grid).to_csv(os.path.join(config.DEBUG_DIR, "hyperbolic_reflective_grid.csv"), index=False)
 
 if __name__ == "__main__":
     # Create an instance of the Test class

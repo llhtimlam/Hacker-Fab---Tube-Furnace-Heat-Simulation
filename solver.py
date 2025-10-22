@@ -3,6 +3,7 @@ High-Resolution Heat Transfer Solver
 Advanced finite difference solver with adaptive time stepping
 """
 
+from matplotlib import gridspec
 import numpy as np
 import h5py  # Optional - only needed for data export
 from scipy.sparse import diags, csc_matrix
@@ -90,9 +91,9 @@ class TubeFurnaceHeatSolver:
         self.emissivity_casing = self.materials.get_emissivity(self.materials.material_index_to_name[7]) # 7: 'aluminum_5052'
 
         # Initialized Lump Node Settings
-        self.T_sample_air_space_avg = config.INITIAL_TEMP # Future implementation to N2 H2O(g) gas flow
-        self.T_air_gap_avg = config.INITIAL_TEMP
-        self.T_aluminum_casing_avg = config.INITIAL_TEMP
+        self.T_sample_air_space_avg = self.AMBIENT_TEMP # Future implementation to N2 H2O(g) gas flow
+        self.T_air_gap_avg = self.AMBIENT_TEMP
+        self.T_aluminum_casing_avg = self.AMBIENT_TEMP
         self.sample_air_space_volume = self.mesh.sample_air_space_volume
 
         # Simulation state variables
@@ -127,9 +128,9 @@ class TubeFurnaceHeatSolver:
             self.mesh.generate_complete_mesh()
             self.material_map_cylindrical_centered = self.mesh.material_map_cylindrical_centered
             # Initialize temperature fields for Cylindrical region
-            self.T = np.full((len(self.r_centers), len(self.z_centers)), config.INITIAL_TEMP)
+            self.T = np.full((self.num_r, self.num_z), config.INITIAL_TEMP)
             if True:
-                self.T[self.material_map_cylindrical_centered == 2] = config.INITIAL_TEMP + 1000  # Pre-heat heating coil region slightly
+                self.T[self.material_map_cylindrical_centered == 2] = config.INITIAL_TEMP + 100  # Pre-heat heating coil region slightly
         self.T_old = self.T.copy()
         
         self.net_heat_flow = np.zeros((self.num_r, self.num_z)) # 2D r*z o
@@ -295,7 +296,7 @@ class TubeFurnaceHeatSolver:
         radial_flux_plus = k_r_grid * self.area_outer_face[:-1, :] * (self.T[:-1, :] - self.T[1:, :]) / (self.dr1_grid + self.dr2_grid) # 2D r-1*z | > Ti - Ti+1
         axial_flux_minus = k_z_grid * self.axial_face_area[:, 1:] * (self.T[:, :-1] - self.T[:, 1:]) / (self.dz1_grid + self.dz2_grid) # 2D r*z-1 < | Ti-1 - Ti
         axial_flux_plus = k_z_grid * self.axial_face_area[:, :-1] * (self.T[:, :-1] - self.T[:, 1:]) / (self.dz1_grid + self.dz2_grid) # 2D r*z-1 | > Ti - Ti+1
-
+        #axial_flux_minus, axial_flux_plus = np.zeros((self.num_r, self.num_z-1)), np.zeros((self.num_r, self.num_z-1))
         # 4. Handle Heat source and sink
         
         boundaries = self.boundary_data()
@@ -319,16 +320,16 @@ class TubeFurnaceHeatSolver:
         # net_heat_flow = radial_flux_plus_neighbor - radial_flux_plus_self + axial_flux_plus_neighbor - axial_flux_plus_self
         # Internal Nodes
         self.net_heat_flow += self.Q_gen_grid * self.volume
-        self.net_heat_flow[1:-1, :] += radial_flux_minus[1:, :] - radial_flux_plus[:-1, :]
-        self.net_heat_flow[:, 1:-1] += axial_flux_minus[:, 1:] - axial_flux_plus[:, :-1]
+        self.net_heat_flow[1:-1, :] += radial_flux_plus[:-1, :] - radial_flux_minus[1:, :]
+        self.net_heat_flow[:, 1:-1] += axial_flux_plus[:, :-1] - axial_flux_minus[:, 1:]
         #self.net_heat_flow += self.radial_flux_minus [0, :] # Boundary conditions for inner radius (r=0) # The radial flux at r=0 is zero due to symmetry.
         # Boundary Nodes
         # Inner Boundary (sample air space convection)
-        self.net_heat_flow +=  Q_conv_to_sample_air_space_local - radial_flux_plus[0, :]
-        self.net_heat_flow[0, 1:-1] += axial_flux_minus[0, 1:] - axial_flux_plus[0, :-1]
+        self.net_heat_flow +=  Q_conv_to_sample_air_space_local + radial_flux_plus[0, :]
+        self.net_heat_flow[0, 1:-1] += axial_flux_plus[0, :-1] - axial_flux_minus[0, 1:]
         # Outer Boundary (air gap convection and reflective radiation)
-        self.net_heat_flow += radial_flux_minus[-1, :] - (Q_conv_to_air_gap_local + Q_rad_out_reflective_local)
-        self.net_heat_flow[-1, 1:-1] += axial_flux_minus[-1, 1:] - axial_flux_plus[-1, :-1]
+        self.net_heat_flow += (Q_conv_to_air_gap_local + Q_rad_out_reflective_local) - radial_flux_minus[-1, :]
+        self.net_heat_flow[-1, 1:-1] += axial_flux_plus[-1, :-1] - axial_flux_minus[-1, 1:]
 
         dT_dt_grid = self.net_heat_flow / (rho_matrix * cp_matrix * self.volume)
         
@@ -339,7 +340,6 @@ class TubeFurnaceHeatSolver:
         self.T_sample_air_space_avg += dT_dt_sample_air_space_avg * self.dt
         self.T_air_gap_avg += dT_dt_air_gap * self.dt
         self.T_aluminum_casing_avg += dT_dt_to_aluminum_casing * self.dt
-
         # Update cylindrical temperature field
         self.T += dT_dt_grid * self.dt
     
@@ -502,13 +502,16 @@ class TubeFurnaceHeatSolver:
                     pd.DataFrame(self.z_axis).to_csv(os.path.join(config.EXPORT_DIR, "z_axis.csv"))
             if self.DEBUG:
                 self.debug_export_final_step_debug_data()
-        fig, axes = plt.subplots(1, 3, figsize=(20, 12))
-        
+        #fig, axes = plt.subplots(3, 2, figsize=(20, 12))
+        fig = plt.figure(figsize=(16, 9))
+        gs = gridspec.GridSpec(2, 3, figure=fig)
+        ax1 = fig.add_subplot(gs[:, 0])
+        ax2 = fig.add_subplot(gs[0, 1:])
+        ax3 = fig.add_subplot(gs[1, 1:])
         # Convert time to hours
         time_hours = np.array(self.time_history) / 3600
         
         # 1. Current temperature field
-        ax1 = axes[0, 0]
         temp_plot = self.Tplot - 273  # Convert to Celsius
         im2 = ax1.contourf(self.z_axis * 1000, self.r_axis * 1000, temp_plot, 
                           levels=50, cmap='hot')
@@ -518,7 +521,6 @@ class TubeFurnaceHeatSolver:
         ax1.set_title(f'Temperature Field at t = {self.time/3600:.2f}h')
 
         # 2. Radial temperature profile at center
-        ax2 = axes[0, 1]
         center_z_idx = len(self.mesh.z_nodes) // 2
         radial_profile = self.Tplot[:, center_z_idx] - 273
         ax2.plot(self.r_axis * 1000, radial_profile, 'r-', linewidth=3)
@@ -529,8 +531,7 @@ class TubeFurnaceHeatSolver:
 
 
         # 3. Axial temperature profile at heating coil
-        ax3 = axes[0, 2]
-        coil_r_idx = self.mesh.kanthal_cement_interface
+        coil_r_idx = self.mesh.glass_kanthal_cement_interface
         axial_profile = self.Tplot[coil_r_idx, :] - 273
         ax3.plot(self.z_axis * 1000, axial_profile, 'b-', linewidth=3)
         ax3.set_xlabel('Axial Position (mm)')
@@ -599,24 +600,59 @@ class TubeFurnaceHeatSolver:
         # net_heat_flow = radial_flux_plus_neighbor - radial_flux_plus_self + axial_flux_plus_neighbor - axial_flux_plus_self
         # Internal Nodes
         self.net_heat_flow += self.Q_gen_grid * self.volume
-        self.net_heat_flow[1:-1, :] += radial_flux_minus[1:, :] - radial_flux_plus[:-1, :]
-        self.net_heat_flow[:, 1:-1] += axial_flux_minus[:, 1:] - axial_flux_plus[:, :-1]
+        self.net_heat_flow[1:-1, :] += radial_flux_plus[:-1, :] - radial_flux_minus[1:, :]
+        self.net_heat_flow[:, 1:-1] += axial_flux_plus[:, :-1] - axial_flux_minus[:, 1:]
         #self.net_heat_flow += self.radial_flux_minus [0, :] # Boundary conditions for inner radius (r=0) # The radial flux at r=0 is zero due to symmetry.
         # Boundary Nodes
         # Inner Boundary (sample air space convection)
-        self.net_heat_flow +=  Q_conv_to_sample_air_space_local - radial_flux_plus[0, :]
-        self.net_heat_flow[0, 1:-1] += axial_flux_minus[0, 1:] - axial_flux_plus[0, :-1]
+        self.net_heat_flow +=  Q_conv_to_sample_air_space_local + radial_flux_plus[0, :]
+        self.net_heat_flow[0, 1:-1] += axial_flux_plus[0, :-1] - axial_flux_minus[0, 1:]
         # Outer Boundary (air gap convection and reflective radiation)
-        self.net_heat_flow += radial_flux_minus[-1, :] - (Q_conv_to_air_gap_local + Q_rad_out_reflective_local)
-        self.net_heat_flow[-1, 1:-1] += axial_flux_minus[-1, 1:] - axial_flux_plus[-1, :-1]
+        self.net_heat_flow += (Q_conv_to_air_gap_local + Q_rad_out_reflective_local) - radial_flux_minus[-1, :]
+        self.net_heat_flow[-1, 1:-1] += axial_flux_plus[-1, :-1] - axial_flux_minus[-1, 1:]
 
         dT_dt_grid = self.net_heat_flow / (rho_matrix * cp_matrix * self.volume)
+        output_string = (
+            f"--- Debugging Data for Step ---\n"
+            f"dr center:    ({self.dr1_grid[7,4]:.4e}, {self.dr2_grid[7,4]:.4e})\n"
+            f"dr +1:        ({self.dr1_grid[8,4]:.4e}, {self.dr2_grid[8,4]:.4e})\n"
+            f"dr -1:        ({self.dr1_grid[6,4]:.4e}, {self.dr2_grid[6,4]:.4e})\n"
+            f"\n"
+            f"k_matrix:     ({k_r_grid[7,4]:.4e}, {k_matrix[7,4]:.4e})\n"
+            f"k_matrix +1:  ({k_r_grid[8,4]:.4e}, {k_matrix[8,4]:.4e})\n"
+            f"k_matrix -1:  ({k_r_grid[6,4]:.4e}, {k_matrix[6,4]:.4e})\n"
+            f"\n"
+            f"Radial flux - 7 flow to 8: {radial_flux_minus[7,4]:.8e}\n"
+            f"Radial flux + 7 flow to 6: {-radial_flux_plus[6,4]:.8e}\n"
+            f"Radial flux +1 - 8 flow to 9: {radial_flux_plus[8,4]:.8e}\n"
+            f"Radial flux +1 + 8 flow to 7: {-radial_flux_plus[7,4]:.8e}\n"
+            f"Radial flux -1 - 6 flow to 7: {radial_flux_minus[6,4]:.8e}\n"
+            f"Radial flux -1 + 6 flow to 5: {-radial_flux_plus[5,4]:.8e}\n"
+            f"\n"
+            f"Net heat flow: {self.net_heat_flow[7,4]:.8e}\n"
+            f"Net heat flow +1: {self.net_heat_flow[8,4]:.8e}\n"
+            f"Net heat flow -1: {self.net_heat_flow[6,4]:.8e}\n"
+            f"\n"
+            f"dT_dt_grid:   {dT_dt_grid[7,4]:.4e}\n"
+            f"dT_dt_grid +1: {dT_dt_grid[8,4]:.4e}\n"
+            f"dT_dt_grid -1: {dT_dt_grid[6,4]:.4e}\n"
+            f"\n"
+            f"dT:           {dT_dt_grid[7,4] * self.dt:.4e}\n"
+            f"dT +1:        {dT_dt_grid[8,4] * self.dt:.4e}\n"
+            f"dT -1:        {dT_dt_grid[6,4] * self.dt:.4e}\n"
+        )
         os.makedirs(config.DEBUG_DIR, exist_ok=True)
         if False:
             pd.DataFrame(hA_conv_to_sample_air_space_local).to_csv(os.path.join(config.DEBUG_DIR, "hA_conv_to_sample_air_space_local.csv"))
             pd.DataFrame(hA_conv_to_air_gap_local).to_csv(os.path.join(config.DEBUG_DIR, "hA_conv_to_air_gap_local.csv"))
             pd.DataFrame(hA_rad_out_reflective_grid).to_csv(os.path.join(config.DEBUG_DIR, "hA_rad_out_reflective_grid.csv"))
         if True:
+            pd.DataFrame(k_matrix).to_csv(os.path.join(config.DEBUG_DIR, "k_matrix.csv"))
+            pd.DataFrame(k_r_grid).to_csv(os.path.join(config.DEBUG_DIR, "k_r_grid.csv"))
+            pd.DataFrame(self.dr1_grid).to_csv(os.path.join(config.DEBUG_DIR, "dr1_grid.csv"))
+            pd.DataFrame(self.dr2_grid).to_csv(os.path.join(config.DEBUG_DIR, "dr2_grid.csv"))
+            pd.DataFrame(self.area_inner_face).to_csv(os.path.join(config.DEBUG_DIR, "area_inner_face.csv"))
+            pd.DataFrame(self.area_outer_face).to_csv(os.path.join(config.DEBUG_DIR, "area_outer_face.csv"))
             pd.DataFrame(radial_flux_minus).to_csv(os.path.join(config.DEBUG_DIR, "radial_flux_minus.csv"))
             pd.DataFrame(radial_flux_plus).to_csv(os.path.join(config.DEBUG_DIR, "radial_flux_plus.csv"))
             pd.DataFrame(axial_flux_minus).to_csv(os.path.join(config.DEBUG_DIR, "axial_flux_minus.csv"))
