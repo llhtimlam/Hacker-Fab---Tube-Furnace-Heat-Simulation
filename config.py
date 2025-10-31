@@ -59,7 +59,7 @@ ENCLOSURE_TYPE = "Cubic Aluminum 5052-H32 Box Enclosure"
 
 # ==================== TEMPERATURE CONDITIONS ====================
 AMBIENT_TEMP = 25 + 273.15  # 298.15 K (25°C)
-INITIAL_TEMP = 60 + 273.15  # Start at 60°C to avoid numerical issues
+INITIAL_TEMP = 30 + 273.15  # Start at 30°C to avoid numerical issues
 TARGET_TEMP = 1000 + 273.15  # 1273.15 K (1000°C) target
 MAX_OPERATING_TEMP = 1500 + 273.15  # 1773.15 K (1500°C) max
 
@@ -95,7 +95,8 @@ REFLECTIVE_STRETCH_FACTOR = 1.05 # Not used, compression ratio < 1
 # Modifying these will cause discretization errors and heating simulation failures
 
 # CONSTRAINT ENFORCEMENT: AXIAL_NODES_HEATING MUST ALWAYS EQUAL HEATING_COIL_TURNS
-AXIAL_NODES_HEATING = 39  # CRITICAL: 39 nodes = 39 coil turns (perfect 1:1 mapping)
+AXIAL_NODES_HEATING = 24  # Legacy CRITICAL: 39 nodes = 39 coil turns (perfect 1:1 mapping)
+AXIAL_STRETCH_FACTOR = 1.05 # 24 for 4 axial node in cold zone
 
 # Cold zone discretization - coarser resolution for uniform regions
 AXIAL_NODES_BEFORE = 4       # Moderate resolution to trace temperature drop profile before heating zone
@@ -121,8 +122,8 @@ EXPORT_MODE = True # Allow export of intermediate data for analysis and future i
 DEBUG_MODE = True  # Enable debug mode for detailed logging
 # ==================== HIGH-RESOLUTION TEMPORAL PARAMETERS ====================
 # Time discretization - HIGH RESOLUTION
-SIMULATION_DURATION = 0.0000009 * 3600  # 30000 = 0.5 hours (64.7218382338 e-6 seconds time steps / 0.05 dr)
-TIME_STEP_SECONDS = 0.0001  # 1 second time steps for high temporal resolution
+SIMULATION_DURATION = 0.5 * 3600  # 0.000000004 * 3600 = 1 iteration for 1.0368e-05 seconds
+TIME_STEP_SECONDS = 0.000010368  # currently set to satisfy CFL condition (1.0368e-05 seconds)
 TOTAL_TIME_STEPS = int(SIMULATION_DURATION / TIME_STEP_SECONDS)
 
 # Adaptive time stepping parameters

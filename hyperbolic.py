@@ -14,24 +14,32 @@ class HyperbolicGridGenerator:
         self.ceramic_outer_radius = config.INSULATION_OUTER_RADIUS
         self.reflective_outer_radius = config.REFLECTIVE_CASING_OUTER_RADIUS
 
+        self.z_start = config.HEATING_COIL_START
+        self.z_end = config.HEATING_COIL_END
+        self.z_length = self.z_end - self.z_start
+        self.z_target = min(self.z_start / config.AXIAL_NODES_BEFORE, config.FURNACE_LENGTH - self.z_end / config.AXIAL_NODES_AFTER)
+
         self.target_radius = config.HEATING_COIL_WIRE_DIAMETER/config.RADIAL_NODES_KANTHAL
         # Optimizing each layer
         self.glass_grid, self.glass_num_nodes, self.glass_minmax_ratio, self.glass_min_dr, self.glass_max_dr, self.glass_min_diff_dr, self.glass_max_diff_dr = self.find_num_nodes_for_stretch(self.sample_radius, self.glass_outer_radius, self.target_radius, config.GLASS_STRETCH_FACTOR)
         self.cement_grid, self.cement_num_nodes, self.cement_minmax_ratio, self.cement_min_dr, self.cement_max_dr, self.cement_min_diff_dr, self.cement_max_diff_dr = self.find_num_nodes_for_stretch(self.kanthal_outer_radius, self.cement_outer_radius, self.target_radius, config.CEMENT_STRETCH_FACTOR)
         self.ceramic_grid, self.ceramic_num_nodes, self.ceramic_minmax_ratio, self.ceramic_min_dr, self.ceramic_max_dr, self.ceramic_min_diff_dr, self.ceramic_max_diff_dr = self.find_num_nodes_for_stretch(self.cement_outer_radius, self.ceramic_outer_radius, self.target_radius, config.CERAMIC_STRETCH_FACTOR)
         self.reflective_grid, self.reflective_num_nodes, self.reflective_minmax_ratio, self.reflective_min_dr, self.reflective_max_dr, self.reflective_min_diff_dr, self.reflective_max_diff_dr = self.find_num_nodes_for_stretch(self.ceramic_outer_radius, self.reflective_outer_radius, self.target_radius, config.REFLECTIVE_STRETCH_FACTOR)
+        self.z_heating_grid, self.z_heating_num_nodes, self.z_heating_minmax_ratio, self.z_heating_min_dr, self.z_heating_max_dr, self.z_heating_min_diff_dr, self.z_heating_max_diff_dr = self.find_num_nodes_for_stretch(self.z_start, self.z_end, self.z_target, config.AXIAL_STRETCH_FACTOR)
         self.total_num_nodes = sum([self.glass_num_nodes, self.cement_num_nodes, self.ceramic_num_nodes, self.reflective_num_nodes])
         # Statistics
         self.glass_nodes_without_stretching = round((self.glass_outer_radius - self.sample_radius)/self.target_radius)
         self.cement_nodes_without_stretching = round((self.cement_outer_radius - self.kanthal_outer_radius)/self.target_radius)
         self.ceramic_nodes_without_stretching = round((self.ceramic_outer_radius - self.cement_outer_radius)/self.target_radius)
         self.reflective_nodes_without_stretching = round((self.reflective_outer_radius - self.ceramic_outer_radius)/self.target_radius)
+        self.z_heating_nodes_without_stretching = round(self.z_length / self.z_target)
         self.total_nodes_without_stretching = sum([self.glass_nodes_without_stretching, self.cement_nodes_without_stretching, self.ceramic_nodes_without_stretching, self.reflective_nodes_without_stretching])
         # Compression ratios
         self.glass_compression_ratio = self.glass_nodes_without_stretching / self.glass_num_nodes
         self.cement_compression_ratio = self.cement_nodes_without_stretching / self.cement_num_nodes
         self.ceramic_compression_ratio = self.ceramic_nodes_without_stretching / self.ceramic_num_nodes
         self.reflective_compression_ratio = self.reflective_nodes_without_stretching / self.reflective_num_nodes
+        self.z_heating_compression_ratio = self.z_heating_nodes_without_stretching / self.z_heating_num_nodes
         self.total_compression_ratio = self.total_nodes_without_stretching / self.total_num_nodes
         # Excluded reflective casing
         self.total_num_nodes_without_reflective = sum([self.glass_num_nodes, self.cement_num_nodes, self.ceramic_num_nodes])
@@ -122,6 +130,14 @@ class HyperbolicGridGenerator:
             print(f"Total number of nodes: {self.total_num_nodes}")
             print(f"Total number of nodes without hyperbolic stretching: {self.total_nodes_without_stretching}")
             print(f"Compression Ratio: {self.total_compression_ratio:.4f}")
+        print("----------------------------------------------------------")
+        print(f"    - Z axis: Heating Zone: {self.z_start*1000:.4f}mm to {self.z_end*1000:.4f}mm ({self.z_length*1000:.4f} mm)")
+        print(f"    - Optimized stretch factor: {config.AXIAL_STRETCH_FACTOR}")
+        print(f"    - Number of nodes: {self.z_heating_num_nodes} (Compared to: {self.z_heating_nodes_without_stretching}), Compression ratio: {self.z_heating_compression_ratio:.4f}")
+        print(f"    - Min-to-max ratio: {self.z_heating_minmax_ratio:.4f}")
+        print(f"    - Min spacing: {self.z_heating_min_dr*1000:.4f} mm, Max spacing: {self.z_heating_max_dr*1000:.4f} mm")
+        print(f"    - Min diff spacing: {self.z_heating_min_diff_dr*1000:.4f} mm, Max diff spacing: {self.z_heating_max_diff_dr*1000:.4f} mm")
+        print(f"Compression Ratio: {self.z_heating_compression_ratio:.4f}")
         print("----------------------------------------------------------")
         print("Summary: Excluded Sample, Kanthal and Reflective Regions")
         print(f"Total number of nodes: {self.total_num_nodes_without_reflective}")

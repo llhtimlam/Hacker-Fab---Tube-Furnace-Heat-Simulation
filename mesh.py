@@ -179,10 +179,13 @@ class TubeFurnaceMesh:
         # COLD ZONE 1: Before heating (1 inch with nodes for discretization)
         z_before = np.linspace(0, config.HEATING_COIL_START, config.AXIAL_NODES_BEFORE + 1, endpoint=True)  # +1 to include boundary
         z_node.extend(z_before)  # Exclude overlap with heating end
-
-        # HEATING ZONE: Heating region (CRITICAL: exactly 39 nodes for 39 coil turns)
-        z_heating = np.linspace(config.HEATING_COIL_START, config.HEATING_COIL_END, config.AXIAL_NODES_HEATING, endpoint=True)[1:]
-        z_node.extend(z_heating)  # Add all heating nodes
+        if config.ENABLE_HYPERBOLIC_MESH:
+            z_heating = self.create_hyperbolic_grid(config.HEATING_COIL_START, config.HEATING_COIL_END, config.AXIAL_NODES_HEATING, config.AXIAL_STRETCH_FACTOR)[1:]
+            z_node.extend(z_heating) # Required at least 2 point to find center
+        else:
+            # HEATING ZONE: Heating region (CRITICAL: exactly 39 nodes for 39 coil turns)
+            z_heating = np.linspace(config.HEATING_COIL_START, config.HEATING_COIL_END, config.AXIAL_NODES_HEATING, endpoint=True)[1:]
+            z_node.extend(z_heating)  # Add all heating nodes
 
         # COLD ZONE 2: After heating (1 inch with nodes for discretization)
         z_after = np.linspace(config.HEATING_COIL_END, config.FURNACE_LENGTH, config.AXIAL_NODES_AFTER + 1, endpoint=True)[1:]  # +1 to include boundary

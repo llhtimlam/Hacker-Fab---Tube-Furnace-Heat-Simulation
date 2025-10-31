@@ -130,7 +130,7 @@ class TubeFurnaceHeatSolver:
             # Initialize temperature fields for Cylindrical region
             self.T = np.full((self.num_r, self.num_z), config.INITIAL_TEMP)
             if True:
-                self.T[self.material_map_cylindrical_centered == 2] = config.INITIAL_TEMP + 100  # Pre-heat heating coil region slightly
+                self.T[self.material_map_cylindrical_centered == 2] = config.INITIAL_TEMP + 500  # Pre-heat heating coil region slightly
         self.T_old = self.T.copy()
         
         self.net_heat_flow = np.zeros((self.num_r, self.num_z)) # 2D r*z o
@@ -364,14 +364,15 @@ class TubeFurnaceHeatSolver:
             self.T
         )
         # Maximum thermal diffusivity in domain
-        alpha = self.k_matrix / (self.rho_matrix * self.cp_matrix)
+        alpha = k_matrix / (rho_matrix * cp_matrix)
         alpha_max = np.max(alpha)
         
         # CFL condition: dt ≤ dx²/(2α) for 2D
-        dt_cfl = config.CFL_SAFETY_FACTOR * np.min(self.dr_centers[1:-1])**2 / (4 * alpha_max)
+        dt_cfl = config.CFL_SAFETY_FACTOR * min(np.min(self.dr_centers[1:-1]),np.min(self.dz_centers[1:-1]))**2 / (4 * alpha_max)
         
         # Apply time step limits
         dt_new = np.clip(dt_cfl, config.MIN_TIME_STEP, config.MAX_TIME_STEP)
+        print(f"Adaptive time step calculated: {dt_new:.4e} seconds (CFL-limited: {dt_cfl:.4e} seconds)")
         return dt_new
         
     def run_simulation(self):
@@ -406,8 +407,9 @@ class TubeFurnaceHeatSolver:
             with tqdm(total=self.total_steps, desc="Time steps", unit="step") as pbar:
                 while step < self.total_steps and self.time < config.SIMULATION_DURATION:
                     # Adaptive time stepping
-                    #if step % 100 == 0:  # Recalculate every 100 steps # Turn off assume user input right dt
+                    #if step % 1 == 0:  # Recalculate every 100 steps # Turn off assume user input right dt
                         #self.dt = self.calculate_time_step()
+
                     
                     # Solve heat equation
                     solve_time = self.solve_heat_equation_hybrid()
@@ -423,7 +425,7 @@ class TubeFurnaceHeatSolver:
                         #print(lumped_temp_dataset)
                         #print(self.T_sample_air_space_avg, self.T_air_gap_avg, self.T_aluminum_casing_avg)
                     if False:  # For checking CFL condition recommendeded dt
-                        if step % 10000 == 0:
+                        if step % 1000 == 0:
                             k_matrix, rho_matrix, cp_matrix = self.materials.get_thermal_properties_vec(
                             self.materials,
                             self.material_map_cylindrical_centered,
